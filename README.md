@@ -6,6 +6,10 @@ This project is primarily for Oslo Skaperfestival 2023, but is an open-minded ma
 intended to test some strategies for using neural networks and computer vision to see if we
 can train a machine in the ancient shell game
 
+![robot mock](https://github.com/bensinober/shell-game/blob/master/docs/shell-robot.png?raw=true)
+
+![segmented view](https://github.com/bensinober/shell-game/blob/master/docs/segmented-cups.png?raw=true)
+
 ## Requirements
 
 Build with the new kid on the block - [Zig](https://ziglang.org/) - for speed, tolerance and curiosity.
