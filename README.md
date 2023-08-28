@@ -12,7 +12,7 @@ can train a machine in the ancient shell game
 
 ## Requirements
 
-Build with the new kid on the block - [Zig](https://ziglang.org/) - for speed, tolerance and curiosity.
+Built with the new kid on the block - [Zig](https://ziglang.org/) - for speed, tolerance and curiosity.
 
 Zig is a static low level C runner-up, still in its infancy but with great promise!
 
@@ -33,7 +33,8 @@ You will, of course, [need Zig](https://ziglang.org/learn/getting-started/).
 
 You will need OpenCV v4.8.0 installed with development headers.
 
-You will need a YOLO v8 model file, in ONNX format.
+You will need a YOLO v8 model file, in ONNX format. I prepare mine with movie and autodistillation.
+To be documented soon.
 
 ## OpenCV install
 
@@ -83,4 +84,4 @@ sudo ldconfig
 
     zig build
 
-zig-out/bin/shell-game [camera id] [.onnx model file]
+    zig-out/bin/shell-game [camera id] [.onnx model file]
