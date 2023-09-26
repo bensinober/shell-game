@@ -56,7 +56,7 @@ const Tracker = struct {
         //var idx: usize = 0;
         // no objects found? we increase disappeared for all until maxLife reached
         if (results.items.len == 0) {
-            std.debug.print("TRACKER: no input vs tracked . {d} {d}\n", .{self.disappeared.items.len, self.objects.items.len});
+            //std.debug.print("TRACKER: no input vs tracked . {d} {d}\n", .{self.disappeared.items.len, self.objects.items.len});
             var i: usize = 0;
             while (i < self.disappeared.items.len) : (i += 1) {
                 self.disappeared.items[i] += 1;
@@ -72,7 +72,7 @@ const Tracker = struct {
         }
         // objects found, but not tracking any? register each as new
         if (self.objects.items.len == 0) {
-            std.debug.print("TRACKER: no existing objects. ", .{});
+            //std.debug.print("TRACKER: no existing objects. ", .{});
             for (results.items) | res | {
                 try self.register(res);
             }
@@ -143,9 +143,9 @@ const Tracker = struct {
                         continue;
                     }
                     self.disappeared.items[i] += 1;
-                    std.log.debug("Increasing tracker ID disappearance: {d}\n", .{i});
+                    //std.log.debug("Increasing tracker ID disappearance: {d}\n", .{i});
                     if (self.disappeared.items[i] > self.maxLife) {
-                        std.debug.print("TRACKER LOST: unregistering item {d}\n", .{i});
+                        //std.debug.print("TRACKER LOST: unregistering item {d}\n", .{i});
                         _ = self.objects.orderedRemove(i);
                         _ = self.disappeared.orderedRemove(i);
                         // try self.unregister(i);
@@ -160,7 +160,7 @@ const Tracker = struct {
                     if (usedCols[i] == true) {
                         continue;
                     }
-                    std.log.debug("Found new object to track:  res: {any}\n", .{res});
+                    //std.log.debug("Found new object to track:  res: {any}\n", .{res});
                     try self.register(res);
                 }
             }
@@ -276,7 +276,7 @@ pub fn main() anyerror!void {
 
         //const rows = probMat.get(i32, 0, 0);
         //const dimensions = probMat.get(i32, 0, 1);
-        std.debug.print("probmat size {any}\n", .{probs.size()});
+        //std.debug.print("probmat size {any}\n", .{probs.size()});
 
         // Yolo v8 reshape
         // xywh vector + numclasses * 8400 rows
@@ -285,7 +285,7 @@ pub fn main() anyerror!void {
 
         var probMat = try probs.reshape(1, @intCast(dims));
         defer probMat.deinit();
-        std.debug.print("probMat dimensions {any} rows {any} dims {any}\n", .{probs.size(), rows, dims});
+        //std.debug.print("probMat dimensions {any} rows {any} dims {any}\n", .{probs.size(), rows, dims});
         cv.Mat.transpose(probMat, &probMat);
         // yolov8 has an output of shape (batchSize, 84,  8400) (Num classes + box[x,y,w,h])
         try performDetection(&squaredImg, &probMat, rows, dims, &tracker, allocator);
@@ -297,8 +297,6 @@ pub fn main() anyerror!void {
         //break;
     }
 }
-
-// cv2.imwrite("object-detection.jpg", original_image)
 
 // performDetection analyzes the results from the detector network,
 // which produces an output blob with a shape 1x1xNx7
@@ -400,20 +398,23 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, cols: i32, tracker: *
     //std.debug.print("trackers length {d}\n", .{reduced.items.len});
 
     // 5) print info
-    std.debug.print("reduced items: {d}\n", .{reduced.items.len});
-    std.debug.print("tracked items: {d}\n", .{tracker.objects.items.len});
-    std.debug.print("disappr items: {d}\n", .{tracker.disappeared.items.len});
+    //std.debug.print("reduced items: {d}\n", .{reduced.items.len});
+    //std.debug.print("tracked items: {d}\n", .{tracker.objects.items.len});
+    //std.debug.print("disappr items: {d}\n", .{tracker.disappeared.items.len});
     for (tracker.objects.items, 0..tracker.objects.items.len) |obj, idx| {
         //std.debug.print("tracker objects : {any}\n", .{obj});
-        const lbl = try std.fmt.allocPrint(allocator, "{s} ({d:.2}) ID: {d:1}", .{CLASSES[obj.classId], obj.score, idx});
-        //cv.rectangle(img, obj.box, green, 1);
+        var buf = [_]u8{undefined} ** 40;
+        const lbl = try std.fmt.bufPrint(&buf, "{s} ({d:.2}) ID: {d}", .{CLASSES[obj.classId], obj.score, idx});
         cv.rectangle(img, obj.box, green, 1);
         cv.putText(img, "+", obj.centre, cv.HersheyFont{ .type = .simplex }, 0.5, green, 1);
         cv.putText(img, lbl, cv.Point.init(obj.box.x - 10, obj.box.y - 10), cv.HersheyFont{ .type = .simplex }, 0.5, green, 1);
-        if (obj.classId == 1) { // a ball
-            cv.arrowedLine(img,
-                cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 30),
-                cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 10), green, 6);
+        if (obj.classId == 1) { // class 1: a ball
+            cv.arrowedLine(
+                img, cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 50),
+                cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 30), green, 4);
+            // we now have a ball to follow.
+            // If we loose track of it, we will track the ID of the nearest object, presuming it is hiding the cup
+            std.debug.print("BALL: {any}\n", .{obj.centre});
         }
     }
 }
