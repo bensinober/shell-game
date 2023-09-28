@@ -15,22 +15,46 @@ const Result = struct {
     classId: usize,
 };
 
+// allocate a byte buffer for sending structured info to tcp socket
+// TODO: unused for now
+const MsgWriter = struct {
+  len: usize = 0,
+  buf: [100]u8 = undefined,
+
+  const Self = @This();
+
+  fn writei32(self: *Self, value: i32) void {
+    self.len += std.fmt.formatIntBuf(self.buf[self.len..], value, 10, .lower, .{});
+  }
+};
+
 const Tracker = struct {
     allocator: Allocator,
     maxLife: i32,                // frames to keep disappeared object before removing
     objects: ArrayList(Result),  // box, centroid (x, y), scores etc.
     disappeared: ArrayList(i32), // counter for measuring disappearance
+    tcpConn: std.net.Stream, // server TCP socket for sending tracking / predictions
 
     const Self = @This();
     pub fn init(allocator: Allocator) !Self {
         var objs: ArrayList(Result) = ArrayList(Result).init(allocator);
         var disapp: ArrayList(i32) = ArrayList(i32).init(allocator);
+        const addr = std.net.Address.initIp4([4]u8{ 127, 0, 0, 1 }, 8666);
+        const tcpConn = std.net.tcpConnectToAddress(addr) catch |err| {
+            std.log.debug("Failed connecting to API socket: {any}\n", .{err});
+        };
+
         return Self{
             .maxLife = 10,
             .allocator = allocator,
             .objects = objs,
             .disappeared = disapp,
+            .tcpConn = tcpConn,
         };
+    }
+
+    fn deinit(self: Self) void {
+        self.tcpConn.close();
     }
 
     fn sortAsc(context: void, a: f32, b: f32) bool {
@@ -47,6 +71,17 @@ const Tracker = struct {
         std.log.debug("Cleaning up stale or disappeared object id: {d}\n", .{id});
         _ = self.objects.orderedRemove(id);
         _ = self.disappeared.orderedRemove(id);
+    }
+
+    // centroid is x,y i32
+    fn sendCentroid(self: Self, p: cv.core.Point) !void {
+        var buf = [_]u8{0} ** 10;
+        var wr = std.io.fixedBufferStream(&buf);
+        _ = try wr.write(&[_]u8{0x02}); // cmd 2    = send centroid
+        _ = try wr.write(&[_]u8{8});    // length 8 = 2 x i32
+        _ = try wr.write(std.mem.asBytes(&p.x));
+        _ = try wr.write(std.mem.asBytes(&p.y));
+        _ = try self.tcpConn.write(&buf);
     }
 
     // input: rects of discovered boxes for updating tracker and watching for
@@ -178,6 +213,8 @@ pub fn formatToSquare(src: Mat) !Mat {
     return res;
 }
 
+
+
 pub fn main() anyerror!void {
     var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
     defer arena.deinit();
@@ -246,7 +283,7 @@ pub fn main() anyerror!void {
 
     // centroid tracker to remember objects
     var tracker = try Tracker.init(allocator);
-
+    defer tracker.deinit();
 
     const mean = cv.Scalar.init(0, 0, 0, 0); // mean subtraction is a technique used to aid our Convolutional Neural Networks.
     const swapRB = true;
@@ -415,6 +452,7 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, cols: i32, tracker: *
             // we now have a ball to follow.
             // If we loose track of it, we will track the ID of the nearest object, presuming it is hiding the cup
             std.debug.print("BALL: {any}\n", .{obj.centre});
+            try tracker.sendCentroid(obj.centre);
         }
     }
 }
