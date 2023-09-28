@@ -10,7 +10,6 @@ const server = Bun.listen({
       const x = buf.readInt32(2)
       const y = buf.readInt32(6)
       console.log(cmd, len, x, y)
-      //socket.write(`${socket.data.sessionId}: ack`)
     },
     open(socket) {
       console.log("openend")

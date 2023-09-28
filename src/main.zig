@@ -40,9 +40,7 @@ const Tracker = struct {
         var objs: ArrayList(Result) = ArrayList(Result).init(allocator);
         var disapp: ArrayList(i32) = ArrayList(i32).init(allocator);
         const addr = std.net.Address.initIp4([4]u8{ 127, 0, 0, 1 }, 8666);
-        const tcpConn = std.net.tcpConnectToAddress(addr) catch |err| {
-            std.log.debug("Failed connecting to API socket: {any}\n", .{err});
-        };
+        const tcpConn = try std.net.tcpConnectToAddress(addr);
 
         return Self{
             .maxLife = 10,

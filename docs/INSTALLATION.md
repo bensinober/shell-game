@@ -19,10 +19,24 @@ developed by Ultralytics and Torchvision.
 
 You will, of course, [need Zig](https://ziglang.org/learn/getting-started/).
 
-You will need OpenCV v4.8.0 installed with development headers.
+You will need OpenCV v4.8.0 installed with development headers. See install for linux below.
 
 You will need a YOLO v8 model file, in ONNX format. I prepare mine with movie and autodistillation.
 To be documented soon.
+
+You will need Bun.js for API, web and bluetooth handling.
+
+## Build and run
+
+Main application
+
+    zig build
+
+    zig-out/bin/shell-game [camera id] [.onnx model file]
+
+Web application
+
+    bun run server.js
 
 ## OpenCV install
 
@@ -90,9 +104,3 @@ Linux: pair and connect with bluetoothctl
 you should now have /dev/rfcomm0
 
 test with `screen /dev/rfcomm0 9600`
-
-## Build and run
-
-    zig build
-
-    zig-out/bin/shell-game [camera id] [.onnx model file]

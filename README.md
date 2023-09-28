@@ -31,6 +31,9 @@ to let eyes follow object.
 
 Man vs machine scores will be updated regularly, as well as a new model for classification/neural processing.
 
+A simple [Bun.js](https://bun.sh/) server handles prediction and tracking data sent from application and forwards to eye tracker
+and other instances using a low level data API
+
 ## Technical instruction
 
 For install instructions and requirements, refer to: [Installation](docs/INSTALLATION.md)
