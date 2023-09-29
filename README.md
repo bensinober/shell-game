@@ -8,7 +8,7 @@ can train a machine in the ancient shell game
 
 ![robot game](docs/shell-game.png)
 
-![segmented view](docs/shell-robot.png)
+![segmented view](docs/segmented-cups.png)
 
 ## Rules of the game
 
