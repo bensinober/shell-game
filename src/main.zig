@@ -1,11 +1,15 @@
 const std = @import("std");
 const cv = @import("zigcv");
+const websocket = @import("websocket");
 
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 const Mat = cv.Mat;
 const Size = cv.Size;
-var CLASSES: [2][]const u8 = [_][]const u8{"red_cup","ball"};
+
+// *** GLOBALS ***
+pub const io_mode = .evented;
+var CLASSES: [2][]const u8 = [_][]const u8{ "red_cup", "ball" };
 
 const Result = struct {
     id: usize,
@@ -15,46 +19,113 @@ const Result = struct {
     classId: usize,
 };
 
-// allocate a byte buffer for sending structured info to tcp socket
-// TODO: unused for now
-const MsgWriter = struct {
-  len: usize = 0,
-  buf: [100]u8 = undefined,
+// GameMode is modified by timer and external Socket commands
+pub const GameMode = enum {
+    IDLE,
+    START,
+    STOP,
+    SNAP,
+    TRACK_BALL,
+    TRACK_HIDDEN,
+    PREDICT,
 
-  const Self = @This();
-
-  fn writei32(self: *Self, value: i32) void {
-    self.len += std.fmt.formatIntBuf(self.buf[self.len..], value, 10, .lower, .{});
-  }
+    pub fn enum2str(self: GameMode) []u8 {
+        //return GameModeStrings[@intFromEnum(self)];
+        return std.meta.fields(?GameMode)[self];
+    }
+    pub fn str2enum(str: []const u8) ?GameMode {
+        //return map.get(str);
+        return std.meta.stringToEnum(GameMode, str);
+    }
 };
 
-const Tracker = struct {
-    allocator: Allocator,
-    maxLife: i32,                // frames to keep disappeared object before removing
-    objects: ArrayList(Result),  // box, centroid (x, y), scores etc.
-    disappeared: ArrayList(i32), // counter for measuring disappearance
-    tcpConn: std.net.Stream, // server TCP socket for sending tracking / predictions
+var gameMode = GameMode.IDLE;
+var lastGameMode = GameMode.IDLE;
 
+var msgDelim = &[_]u8{54, 54, 54, 54, 54, 54, 54, 54}; // 6666666
+
+var wsClient: websocket.Client = undefined;     // Websocket client
+//var client: std.net.Stream = undefined;       // TCP client for sending tracking / predictions / messages
+//var httpClient: std.http.Client = undefined;  // HTTP client for sending images
+//var server: std.net.StreamServer = undefined; // listening TCP socket for receiving commands from client
+
+const imgUri = std.Uri.parse("http://localhost:8665/api/image") catch unreachable;
+
+// Massage handler needs to be global as it lives in a separate thread
+// pub fn MsgHandler(srv: *std.net.StreamServer) !void {
+//     while (true) {
+//         var conn = try srv.accept();
+//         defer conn.stream.close();
+//         var buf: [100]u8 = undefined;
+//         const msg_size = try conn.stream.read(buf[0..]);
+//         std.log.debug("MSG FROM SERVER: {s}", .{buf[0..msg_size]});
+//         const mode = GameMode.str2enum(buf[0..msg_size-2]);
+//         if (mode != null) {
+//             lastGameMode = gameMode;
+//             gameMode = mode.?;
+//             std.log.debug("switched mode from: {any} to {any}", .{lastGameMode, gameMode});
+//             // may not need separate socket for commands
+//             var resBuf = [_]u8{0} ** 10;
+//             var wr = std.io.fixedBufferStream(&resBuf);
+//             _ = try wr.write(&[_]u8{0x01}); // cmd 1    = send gamemode change
+//             _ = try wr.write(std.mem.asBytes(&gameMode));
+//             _ = try client.write(&resBuf);
+//             _ = try conn.stream.write("OK\n");
+//         } else {
+//             _ = try conn.stream.write("NOK\n"); // not found in GameMode
+//         }
+//     }
+// }
+
+const MsgHandler = struct {
+    allocator: Allocator,
+
+    pub fn handle(self: MsgHandler, msg: websocket.Message) !void {
+        std.log.debug("got msg: {any}", .{msg.data});
+        const mode = GameMode.str2enum(msg.data);
+        if (mode != null) {
+            lastGameMode = gameMode;
+            gameMode = mode.?;
+            std.log.debug("switched mode from: {any} to {any}", .{lastGameMode, gameMode});
+            const res = try self.allocator.alloc(u8, 8);
+            @memcpy(res, &[_]u8{0, 0, 2, 0, 0, 0, 0x4f, 0x4b}); // OK
+            _ = try wsClient.writeBin(res);
+        } else {
+            const res = try self.allocator.alloc(u8, 9);
+            @memcpy(res, &[_]u8{0, 0, 2, 0, 0, 0, 0x4e, 0x4f, 0x4b}); // NOK
+            _ = try wsClient.write(res);
+        }
+    }
+
+    pub fn close(_: MsgHandler) void {
+    }
+};
+
+
+// This is the main tracking function for the game
+const GameTracker = struct {
     const Self = @This();
+    allocator: Allocator,
+    maxLife: i32,                 // num of frames to keep disappeared object before removing
+    objects: ArrayList(Result),   // box, centroid (x, y), scores etc.
+    disappeared: ArrayList(i32),  // counter(s) for measuring disappearance
+    timer: std.time.Timer,
+
     pub fn init(allocator: Allocator) !Self {
         var objs: ArrayList(Result) = ArrayList(Result).init(allocator);
         var disapp: ArrayList(i32) = ArrayList(i32).init(allocator);
-        const addr = std.net.Address.initIp4([4]u8{ 127, 0, 0, 1 }, 8666);
-        const tcpConn = try std.net.tcpConnectToAddress(addr);
+        var timer = try std.time.Timer.start();
 
         return Self{
             .maxLife = 10,
             .allocator = allocator,
             .objects = objs,
             .disappeared = disapp,
-            .tcpConn = tcpConn,
+            .timer = timer,
         };
     }
 
-    fn deinit(self: Self) void {
-        self.tcpConn.close();
-    }
-
+    // NOT USED
     fn sortAsc(context: void, a: f32, b: f32) bool {
         return std.sort.asc(f32)(context, a, b);
     }
@@ -71,16 +142,86 @@ const Tracker = struct {
         _ = self.disappeared.orderedRemove(id);
     }
 
+    fn startTimer(self: *Self) void {
+        std.log.debug("Starting game timer\n");
+        self.timer.reset();
+    }
+
+    fn getTimeSpent(self: *Self) u64 {
+        std.log.debug("getting lap time\n");
+        return self.timer.lap();
+    }
+
+    // send image to http server
+    // fn sendImage(self: Self, img: *cv.Mat) !void {
+    //     var headers = std.http.Headers{ .allocator = self.allocator };
+    //     defer headers.deinit();
+    //     try headers.append("Content-Type", "image/png");
+    //     var body = cv.imEncode(cv.FileExt.png, img.*, self.allocator) catch |err| {
+    //         std.debug.print("Error encoding image: {any}\n", .{err});
+    //         return err;
+    //     };
+    //     var req = try httpClient.request(.POST, imgUri, headers, .{});
+    //     defer req.deinit();
+    //     req.transfer_encoding = .chunked ;
+    //     try req.start();
+    //     var reqBody = try body.toOwnedSlice();
+    //     _ = try req.write(reqBody);
+    //     try req.finish();
+    //     try req.wait();
+    //     if (req.response.status != .ok) {
+    //         std.debug.print("Image not sent: {any}\n", .{req.response.status});
+    //     }
+    // }
+
+    // first 6 bytes is cmd (1) , gamemode (1) and buffer length (4)
+    fn sendImage(self: Self, img: *cv.Mat) !void {
+        var bs = cv.imEncode(cv.FileExt.png, img.*, self.allocator) catch |err| {
+            std.debug.print("Error encoding image: {any}\n", .{err});
+            return err;
+        };
+        defer bs.deinit();
+        const len: i32 = @intCast(bs.items.len);
+        std.debug.print("Image length: {d}\n", .{len});
+        var cmd: u8 = 3;
+        _ = try bs.insert(0, cmd);
+        _ = try bs.insertSlice(1, std.mem.asBytes(&gameMode));
+        _ = try bs.insertSlice(2, std.mem.asBytes(&len));
+        // var buf = [_]u8{0} ** 600000; // needs to hold entire png
+        // var wr = std.io.fixedBufferStream(&buf);
+        // _ = try wr.write(&[_]u8{0x03});
+        // _ = try wr.write(std.mem.asBytes(&gameMode));
+        // _ = try wr.write(std.mem.asBytes(&len)); // length
+        // _ = try wr.write(bs.items);
+        // _ = try client.write(&buf);
+        // var num = client.write(bs.items) catch |err| {
+        //     std.debug.print("Error sending image: {any}\n", .{err});
+        //     return err;
+        // };
+        wsClient.writeBin(bs.items) catch |err| {
+            std.debug.print("Error sending image: {any}\n", .{err});
+            return err;
+        };
+        //std.debug.print("Image length AFTER: {d}\n", .{bs.items.len});
+        //std.debug.print("First: {any}\n", .{bs.items[0..6].*});
+        //std.debug.print("Sent bytes: {d}\n", .{num});
+        //_ = try client.write(msgDelim);
+    }
+
     // centroid is x,y i32
-    fn sendCentroid(self: Self, p: cv.core.Point) !void {
-        var buf = [_]u8{0} ** 10;
+    fn sendCentroid(_: Self, p: cv.core.Point) !void {
+        var buf = [_]u8{0} ** 14;
+        const len: i32 = @intCast(8);
         var wr = std.io.fixedBufferStream(&buf);
         _ = try wr.write(&[_]u8{0x02}); // cmd 2    = send centroid
-        _ = try wr.write(&[_]u8{8});    // length 8 = 2 x i32
+        _ = try wr.write(std.mem.asBytes(&gameMode));
+        _ = try wr.write(std.mem.asBytes(&len)); // length
         _ = try wr.write(std.mem.asBytes(&p.x));
         _ = try wr.write(std.mem.asBytes(&p.y));
-        _ = try self.tcpConn.write(&buf);
+        //_ = try client.write(&buf);
+        _ = try wsClient.writeBin(&buf);
     }
+
 
     // input: rects of discovered boxes for updating tracker and watching for
     // disappearances by an incrementing counter
@@ -106,7 +247,7 @@ const Tracker = struct {
         // objects found, but not tracking any? register each as new
         if (self.objects.items.len == 0) {
             //std.debug.print("TRACKER: no existing objects. ", .{});
-            for (results.items) | res | {
+            for (results.items) |res| {
                 try self.register(res);
             }
         } else {
@@ -152,7 +293,7 @@ const Tracker = struct {
                 //trackerDiffs[trIdx] = inputDiffs;
                 // find index of lowest diff/distance
                 var minIdx: usize = 0;
-                for (inputDiffs.items, 0..) |diff,i| {
+                for (inputDiffs.items, 0..) |diff, i| {
                     if (diff < inputDiffs.items[minIdx]) {
                         minIdx = i;
                     }
@@ -171,7 +312,7 @@ const Tracker = struct {
             if (self.objects.items.len >= results.items.len) {
                 //std.log.debug("surplus objects found, usedRows: {any}\n", .{usedRows});
                 var i: usize = 0;
-                while (i < self.objects.items.len ) : (i += 1) {
+                while (i < self.objects.items.len) : (i += 1) {
                     if (usedRows[i] == true) {
                         continue;
                     }
@@ -201,138 +342,6 @@ const Tracker = struct {
     }
 };
 
-// We need square for onnx inferencing to work
-pub fn formatToSquare(src: Mat) !Mat {
-    const col = src.cols();
-    const row = src.rows();
-    const _max = @max(col, row);
-    var res = try cv.Mat.initZeros(_max, _max, cv.Mat.MatType.cv8uc3);
-    src.copyTo(&res);
-    return res;
-}
-
-
-
-pub fn main() anyerror!void {
-    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
-    defer arena.deinit();
-    const allocator = arena.allocator();
-    //var allocator = std.heap.page_allocator;
-    var args = try std.process.argsWithAllocator(allocator);
-    const prog = args.next();
-    const deviceIdChar = args.next() orelse {
-        std.log.err("usage: {s} [cameraID] [model]", .{prog.?});
-        std.os.exit(1);
-    };
-    const model = args.next() orelse {
-        std.log.err("usage: {s} [cameraID [model]]", .{prog.?});
-        std.os.exit(1);
-    };
-    args.deinit();
-
-    const deviceId = try std.fmt.parseUnsigned(i32, deviceIdChar, 10);
-    _ = try std.fmt.parseUnsigned(i32, deviceIdChar, 10);
-
-    // open webcam
-    var webcam = try cv.VideoCapture.init();
-    try webcam.openDevice(deviceId);
-    defer webcam.deinit();
-
-    // open display window
-    const winName = "DNN Detection";
-    var window = try cv.Window.init(winName);
-    defer window.deinit();
-
-    // prepare image matrix
-    var img = try cv.Mat.init();
-    defer img.deinit();
-    //img = try cv.imRead("object.jpg", .unchanged);
-    //img = try cv.imRead("cardboard_cup1-00022.png", .unchanged);
-
-    //var img = try cv.Mat.initSize(640,640, cv.Mat.MatType.cv8uc3);
-
-    // open DNN object tracking model
-    // pytorch
-    const scale: f64 = 1.0 / 255.0;
-    const size: cv.Size = cv.Size.init(640, 640);
-    var net = cv.Net.readNetFromONNX(model) catch |err| {
-        std.debug.print("Error: {any}\n", .{err});
-        std.os.exit(1);
-    };
-
-    // tensorflowjs mobilenet
-    // const scale: f64 = 1.0 / 255.0;
-    // const size: cv.Size = cv.Size.init(300, 300);
-    // var net = cv.Net.readNetFromTensorflow(model) catch |err| {
-    //     //var net = cv.Net.readNet(model, "") catch |err| {
-    //     std.debug.print("Error: {any}\n", .{err});
-    //     std.os.exit(1);
-    // };
-    defer net.deinit();
-
-    if (net.isEmpty()) {
-        std.debug.print("Error: could not load model\n", .{});
-        std.os.exit(1);
-    }
-
-    net.setPreferableBackend(.default);
-    net.setPreferableTarget(.cpu);
-    std.debug.print("getLayerNames {any}\n", .{net});
-
-    // centroid tracker to remember objects
-    var tracker = try Tracker.init(allocator);
-    defer tracker.deinit();
-
-    const mean = cv.Scalar.init(0, 0, 0, 0); // mean subtraction is a technique used to aid our Convolutional Neural Networks.
-    const swapRB = true;
-    const crop = false;
-
-    while (true) {
-        webcam.read(&img) catch {
-            std.debug.print("capture failed", .{});
-            std.os.exit(1);
-        };
-        if (img.isEmpty()) {
-            continue;
-        }
-
-        var squaredImg = try formatToSquare(img);
-        defer squaredImg.deinit();
-        cv.resize(squaredImg, &squaredImg, size, 0, 0, .{});
-
-        // transform image to CV matrix / 4D blob
-        var blob = try cv.Blob.initFromImage(squaredImg, scale, size, mean, swapRB, crop);
-        defer blob.deinit();
-        // run inference on Matrix
-        // prob result: objid, classid, confidence, left, top, right, bottom.
-        net.setInput(blob, "");
-        var probs = try net.forward("");
-        defer probs.deinit();
-
-        //const rows = probMat.get(i32, 0, 0);
-        //const dimensions = probMat.get(i32, 0, 1);
-        //std.debug.print("probmat size {any}\n", .{probs.size()});
-
-        // Yolo v8 reshape
-        // xywh vector + numclasses * 8400 rows
-        const rows: usize = @intCast(probs.size()[2]);
-        const dims: i32 = probs.size()[1];
-
-        var probMat = try probs.reshape(1, @intCast(dims));
-        defer probMat.deinit();
-        //std.debug.print("probMat dimensions {any} rows {any} dims {any}\n", .{probs.size(), rows, dims});
-        cv.Mat.transpose(probMat, &probMat);
-        // yolov8 has an output of shape (batchSize, 84,  8400) (Num classes + box[x,y,w,h])
-        try performDetection(&squaredImg, &probMat, rows, dims, &tracker, allocator);
-
-        window.imShow(squaredImg);
-        if (window.waitKey(1) >= 0) {
-            break;
-        }
-        //break;
-    }
-}
-
 // performDetection analyzes the results from the detector network,
 // which produces an output blob with a shape 1x1xNx7
 // where N is the number of detections, and each detection
@@ -340,7 +349,7 @@ pub fn main() anyerror!void {
 // yolov8 has an output of shape (batchSize, 84,  8400) (Num classes + box[x,y,w,h])
 //float x_factor = modelInput.cols / modelShape.width;
 //float y_factor = modelInput.rows / modelShape.height;
-fn performDetection(img: *Mat, results: *Mat, rows: usize, cols: i32, tracker: *Tracker, allocator: Allocator) !void {
+fn performDetection(img: *Mat, results: *Mat, rows: usize, cols: i32, tracker: *GameTracker, allocator: Allocator) !void {
     //try cv.imWrite("object.jpg", img.*);
     //std.debug.print("rows {d}\n", .{rows});
     //std.debug.print("cols {d}\n", .{cols});
@@ -366,7 +375,7 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, cols: i32, tracker: *
     // 1) first run, fetch all detections with a minimum score
     while (i < rows) : (i += 1) {
         // scores is a vector of results[0..4] (x,y,w,h) followed by class scores [4..7] (total 8 floats)
-        var classScores = try results.region(cv.Rect.init(4, @intCast(i), cols-4, 1));
+        var classScores = try results.region(cv.Rect.init(4, @intCast(i), cols - 4, 1));
         //var classScores = try cv.Mat.initFromMat(results, 1, 4,results.getType(), 1, 4);
         //var classScores = try cv.Mat.init();
         defer classScores.deinit();
@@ -439,18 +448,180 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, cols: i32, tracker: *
     for (tracker.objects.items, 0..tracker.objects.items.len) |obj, idx| {
         //std.debug.print("tracker objects : {any}\n", .{obj});
         var buf = [_]u8{undefined} ** 40;
-        const lbl = try std.fmt.bufPrint(&buf, "{s} ({d:.2}) ID: {d}", .{CLASSES[obj.classId], obj.score, idx});
+        const lbl = try std.fmt.bufPrint(&buf, "{s} ({d:.2}) ID: {d}", .{ CLASSES[obj.classId], obj.score, idx });
         cv.rectangle(img, obj.box, green, 1);
         cv.putText(img, "+", obj.centre, cv.HersheyFont{ .type = .simplex }, 0.5, green, 1);
         cv.putText(img, lbl, cv.Point.init(obj.box.x - 10, obj.box.y - 10), cv.HersheyFont{ .type = .simplex }, 0.5, green, 1);
         if (obj.classId == 1) { // class 1: a ball
-            cv.arrowedLine(
-                img, cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 50),
-                cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 30), green, 4);
+            cv.arrowedLine(img, cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 50), cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 30), green, 4);
             // we now have a ball to follow.
             // If we loose track of it, we will track the ID of the nearest object, presuming it is hiding the cup
             std.debug.print("BALL: {any}\n", .{obj.centre});
             try tracker.sendCentroid(obj.centre);
+        }
+        if (gameMode == GameMode.SNAP) {
+            std.debug.print("SENDING IMAGE\n", .{});
+            try tracker.sendImage(img);
+            gameMode = lastGameMode;
+        }
+    }
+}
+
+// We need square for onnx inferencing to work
+pub fn formatToSquare(src: Mat) !Mat {
+    const col = src.cols();
+    const row = src.rows();
+    const _max = @max(col, row);
+    var res = try cv.Mat.initZeros(_max, _max, cv.Mat.MatType.cv8uc3);
+    src.copyTo(&res);
+    return res;
+}
+
+pub fn main() anyerror!void {
+    var arena = std.heap.ArenaAllocator.init(std.heap.page_allocator);
+    defer arena.deinit();
+    const allocator = arena.allocator();
+    var args = try std.process.argsWithAllocator(allocator);
+
+    const prog = args.next();
+    const deviceIdChar = args.next() orelse {
+        std.log.err("usage: {s} [cameraID] [model]", .{prog.?});
+        std.os.exit(1);
+    };
+    const model = args.next() orelse {
+        std.log.err("usage: {s} [cameraID [model]]", .{prog.?});
+        std.os.exit(1);
+    };
+    args.deinit();
+
+    const deviceId = try std.fmt.parseUnsigned(i32, deviceIdChar, 10);
+    _ = try std.fmt.parseUnsigned(i32, deviceIdChar, 10);
+
+    // open webcam
+    var webcam = try cv.VideoCapture.init();
+    try webcam.openDevice(deviceId);
+    defer webcam.deinit();
+
+    // open display window
+    const winName = "DNN Detection";
+    var window = try cv.Window.init(winName);
+    defer window.deinit();
+
+    // prepare image matrix
+    var img = try cv.Mat.init();
+    defer img.deinit();
+    //img = try cv.imRead("object.jpg", .unchanged);
+    //img = try cv.imRead("cardboard_cup1-00022.png", .unchanged);
+
+    //var img = try cv.Mat.initSize(640,640, cv.Mat.MatType.cv8uc3);
+
+    // open DNN object tracking model
+    // pytorch
+    const scale: f64 = 1.0 / 255.0;
+    const size: cv.Size = cv.Size.init(640, 640);
+    var net = cv.Net.readNetFromONNX(model) catch |err| {
+        std.debug.print("Error: {any}\n", .{err});
+        std.os.exit(1);
+    };
+
+    // tensorflowjs mobilenet
+    // const scale: f64 = 1.0 / 255.0;
+    // const size: cv.Size = cv.Size.init(300, 300);
+    // var net = cv.Net.readNetFromTensorflow(model) catch |err| {
+    //     //var net = cv.Net.readNet(model, "") catch |err| {
+    //     std.debug.print("Error: {any}\n", .{err});
+    //     std.os.exit(1);
+    // };
+    defer net.deinit();
+
+    if (net.isEmpty()) {
+        std.debug.print("Error: could not load model\n", .{});
+        std.os.exit(1);
+    }
+
+    net.setPreferableBackend(.default);
+    net.setPreferableTarget(.cpu);
+    std.debug.print("getLayerNames {any}\n", .{net});
+
+    // centroid tracker to remember objects
+    var tracker = try GameTracker.init(allocator);
+    //defer tracker.deinit();
+
+    // TCP SOCKET listening server
+    //const serverAddr = std.net.Address.initIp4([4]u8{ 127, 0, 0, 1 }, 8667);
+    //server = std.net.StreamServer.init(.{ .reuse_address = true });
+    //try (&server).listen(serverAddr);
+
+    // TCP SOCKET client
+    //const clientAddr = std.net.Address.initIp4([4]u8{ 127, 0, 0, 1 }, 8666);
+    //client = try std.net.tcpConnectToAddress(clientAddr);
+    //defer client.close();
+
+    // HTTP Client
+    //httpClient = std.http.Client{ .allocator = allocator };
+    //defer httpClient.deinit();
+    // const msgThread = try std.Thread.spawn(.{}, MsgHandler, .{&client});
+    // defer msgThread.join();
+
+    // Game mode manager in separate thread
+     wsClient = try websocket.connect(allocator, "localhost", 8665, .{});
+    defer wsClient.deinit();
+
+    try wsClient.handshake("/ws?channels=commands,images,centroids", .{
+         .timeout_ms = 5000,
+         .headers = "host: localhost:8665\r\n",
+    });
+     const msgHandler = MsgHandler{.allocator = allocator};
+     const thread = try wsClient.readLoopInNewThread(msgHandler);
+     thread.detach();
+
+
+
+    const mean = cv.Scalar.init(0, 0, 0, 0); // mean subtraction is a technique used to aid our Convolutional Neural Networks.
+    const swapRB = true;
+    const crop = false;
+
+    while (true) {
+        webcam.read(&img) catch {
+            std.debug.print("capture failed", .{});
+            std.os.exit(1);
+        };
+        if (img.isEmpty()) {
+            continue;
+        }
+
+        var squaredImg = try formatToSquare(img);
+        defer squaredImg.deinit();
+        cv.resize(squaredImg, &squaredImg, size, 0, 0, .{});
+
+        // transform image to CV matrix / 4D blob
+        var blob = try cv.Blob.initFromImage(squaredImg, scale, size, mean, swapRB, crop);
+        defer blob.deinit();
+        // run inference on Matrix
+        // prob result: objid, classid, confidence, left, top, right, bottom.
+        net.setInput(blob, "");
+        var probs = try net.forward("");
+        defer probs.deinit();
+
+        //const rows = probMat.get(i32, 0, 0);
+        //const dimensions = probMat.get(i32, 0, 1);
+        //std.debug.print("probmat size {any}\n", .{probs.size()});
+
+        // Yolo v8 reshape
+        // xywh vector + numclasses * 8400 rows
+        const rows: usize = @intCast(probs.size()[2]);
+        const dims: i32 = probs.size()[1];
+
+        var probMat = try probs.reshape(1, @intCast(dims));
+        defer probMat.deinit();
+        //std.debug.print("probMat dimensions {any} rows {any} dims {any}\n", .{probs.size(), rows, dims});
+        cv.Mat.transpose(probMat, &probMat);
+        // yolov8 has an output of shape (batchSize, 84,  8400) (Num classes + box[x,y,w,h])
+        try performDetection(&squaredImg, &probMat, rows, dims, &tracker, allocator);
+
+        window.imShow(squaredImg);
+        if (window.waitKey(1) >= 0) {
+            break;
         }
     }
 }

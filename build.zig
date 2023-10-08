@@ -66,6 +66,11 @@ pub fn build(b: *std.Build) void {
 
     exe.addAnonymousModule("zigcv", .{ .source_file = .{ .path = "libs/zigcv.zig" } });
 
+    // Websocket module
+    const wsMod = b.dependency("websocket", .{ .target = target, .optimize = optimize});
+    exe.addModule("websocket", wsMod.module("websocket"));
+
+
     exe.linkLibrary(cv);
     exe.addIncludePath(.{ .path = "include" });
     exe.addIncludePath(.{ .path = "/usr/local/include" });
