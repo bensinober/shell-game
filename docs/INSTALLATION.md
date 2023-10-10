@@ -34,7 +34,13 @@ Main application
 
     zig-out/bin/shell-game [camera id] [.onnx model file]
 
-Web application
+## Web application and server (websocket)
+
+Install bun (local user, on linux ~/.bun/bin/bun):
+
+    curl -fsSL https://bun.sh/install | bash
+
+Run server
 
     bun run server.js
 
@@ -57,6 +63,7 @@ curl -Lo opencv_contrib.zip https://github.com/opencv/opencv_contrib/archive/ref
 unzip -q opencv_contrib.zip
 rm opencv.zip opencv_contrib.zip
 
+cd opencv
 mkdir -p build && cd build
 
 CC="zig cc" CXX="zig c++" cmake \
@@ -91,7 +98,6 @@ sudo ldconfig
     sudo apt-get install libbluetooth-dev
 
 pair animatronics device to be controlled
-
 Linux: pair and connect with bluetoothctl
 
   $ bluetoothctl
