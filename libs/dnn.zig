@@ -253,10 +253,13 @@ pub const Net = struct {
         return @as(f64, @floatFromInt(c.Net_GetPerfProfile(self.ptr)));
     }
 
+    // Returns indexes of layers with unconnected outputs.
+    // FIXIT: Rework API to registerOutput() approach, deprecate this call
+    // https://docs.opencv.org/4.8.0/db/d30/classcv_1_1dnn_1_1Net.html#ae62a73984f62c49fd3e8e689405b056a
     pub fn getUnconnectedOutLayers(self: Self, allocator: std.mem.Allocator) !std.ArrayList(i32) {
         var res: c.IntVector = undefined;
         defer c.IntVector_Close(res);
-        _ = c.Net_GetUnconnectedOutLayers(self.ptr, &res);
+        c.Net_GetUnconnectedOutLayers(self.ptr, &res);
         var return_res = std.ArrayList(i32).init(allocator);
         {
             var i: usize = 0;
@@ -267,29 +270,29 @@ pub const Net = struct {
         return return_res;
     }
 
-    pub fn getLayerNames(self: *Self, allocator: std.mem.Allocator) !struct {
-        items: []const []const u8,
-        arena: std.heap.ArenaAllocator,
-
-        pub fn deinit(self_: *@This()) void {
-            self_.arena.deinit();
-        }
-    } {
-        var arena = std.heap.ArenaAllocator.init(allocator);
-        var arena_allocator = arena.allocator();
-
+    // Get list of layer names used. Returns array of strings
+    // https://docs.opencv.org/4.8.0/db/d30/classcv_1_1dnn_1_1Net.html#ae62a73984f62c49fd3e8e689405b056a
+    pub fn getLayerNames(self: Self, allocator: std.mem.Allocator) ![][]const u8 {
         var c_strs: c.CStrings = undefined;
-        defer c.CStrings_Close(c_strs);
+        //defer c.CStrings_Close(c_strs);
         c.Net_GetLayerNames(self.ptr, &c_strs);
         const len = @as(usize, @intCast(c_strs.length));
-        var return_array = try arena_allocator.alloc([]const u8, len);
-        for (return_array, 0..) |*item, i| {
-            item.* = try arena_allocator.dupe(u8, std.mem.span(c_strs.strs[i]));
+        var return_strings = try allocator.alloc([]const u8, len);
+
+        for (return_strings, 0..) |*item, i| {
+            item.* = try allocator.dupe(u8, std.mem.span(c_strs.strs[i]));
         }
-        return .{
-            .items = return_array,
-            .arena = arena,
-        };
+        // for (return_strings.items, 0..) |_, i| {
+        //     const layerName = std.mem.span(c_strs.strs[i]);
+        //     std.debug.print("Layer name {any}\n", .{layerName});
+        //     return_strings.items[i] = try allocator.dupe(u8, layerName);
+        // }
+        // var i: usize = 0;
+        // while (i < c_strs.length) : (i += 1) {
+        //     const str = std.mem.sliceTo(c_strs.strs[i], 0);
+        //     try return_strings.append(str);
+        // }
+        return return_strings;
     }
 
     pub fn getLayer(self: Self, layerid: i32) !Layer {
