@@ -49,20 +49,16 @@ wsImg.addEventListener("message", event => {
 var timerId
 var duration
 var imgCnt
+const buf = new ArrayBuffer(6);
+const dv = new DataView(buf)
 
 function startTimer() {
-  const buf = new ArrayBuffer(10);
-  const dv = new DataView(buf, 0, 10)
   dv.setUint8(0, 1) // command
-  dv.setUint8(1, 3) // gamemode
-  dv.setInt32(2, 4, true) // command length, little endian
-  let enc = new TextEncoder()
-  let cmd = enc.encode("SNAP")
-  const snapCmd = new Uint8Array(buf)
-  snapCmd.set(cmd, 6)
-  console.log(snapCmd)
+  dv.setUint8(1, 3) // GameMode.SNAP
+  dv.setInt32(2, 0, true) // command length, little endian
+  const sendCmd = new Uint8Array(buf)
   duration = 18
-  imgCnt = 17
+  imgCnt = 17 // we save the last for after prediction
 
   timerId = setInterval(function (evt) {
     if(duration <= 0) {
@@ -71,7 +67,7 @@ function startTimer() {
     } else {
       document.querySelector(".countdownTimer").innerHTML = "00:" + duration.toString().padStart(2, "0")
       if (imgCnt > 0) {
-        wsCmd.send(snapCmd)
+        wsCmd.send(sendCmd)
       }
     }
     duration -= 1
@@ -81,7 +77,11 @@ function startTimer() {
 
 // button actions
 document.getElementById("startBtn").addEventListener("click", startTimer)
-document.getElementById("snapBtn").addEventListener("click", function(evt) {
-  console.log("SNAP")
-  wsCmd.send(snapCmd)
+document.getElementById("predictBtn").addEventListener("click", function(evt) {
+  console.log("PREDICT")
+  dv.setUint8(0, 1) // command
+  dv.setUint8(1, 7) // GameMode.PREDICT
+  dv.setInt32(2, 0, true) // command length, little endian
+  const sendCmd = new Uint8Array(buf)
+  wsCmd.send(sendCmd)
 })
