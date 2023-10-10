@@ -3,6 +3,7 @@ const BASE_PATH = "./www"
 var pendingBuffer,pendingCmd, pendingSize, pendingMode
 const httpServer = Bun.serve({
   port: 8665,
+  host: "0.0.0.0",
   async fetch(req, server) {
     const url = new URL(req.url);
     if (url.pathname === "/ws") {
@@ -49,7 +50,8 @@ const httpServer = Bun.serve({
         break
       case 1:
         console.log(`GAME MODE CHANGE: ${pendingMode}`)
-        ws.publish("commands", pendingBuffer)
+        ws.publish("commands", data) // we just forward message
+        //ws.publish("commands", pendingBuffer)
         break
       case 2:
         console.log("CENTROID DATA")
