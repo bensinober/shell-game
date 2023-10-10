@@ -73,6 +73,7 @@ pub fn build(b: *std.Build) void {
 
     exe.linkLibrary(cv);
     exe.addIncludePath(.{ .path = "include" });
+    exe.addIncludePath(.{ .path = "include/contrib" });
     exe.addIncludePath(.{ .path = "/usr/local/include" });
     exe.addIncludePath(.{ .path = "/usr/local/include/opencv4" });
     exe.linkSystemLibrary("opencv4");

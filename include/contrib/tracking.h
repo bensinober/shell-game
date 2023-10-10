@@ -1,4 +1,3 @@
-
 #ifndef _OPENCV3_TRACKING_H_
 #define _OPENCV3_TRACKING_H_
 
