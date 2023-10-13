@@ -1031,10 +1031,8 @@ pub fn min(self: Self, other: Self, dest: *Self) void {
 /// For further details, please see:
 /// https://docs.opencv.org/master/d2/de8/group__core__array.html#gafafb2513349db3bcff51f54ee5592a19
 ///
-pub fn addMatWeighted(self: Self, alpha: f64, m: Self, beta: f64) Self {
-    var dest = self.init();
-    _ = c.Mat_AddWeighted(self.ptr, alpha, m.ptr, beta, dest.ptr);
-    return dest;
+pub fn addMatWeighted(self: Self, alpha: f64, addM: Self, beta: f64, gamma: f64, dest: *Self) void {
+    c.Mat_AddWeighted(self.ptr, alpha, addM.ptr, beta, gamma, dest.*.ptr);
 }
 
 pub fn bitwise(self: Self, m: Self, dest: *Self, comptime op: BitOperationType) void {

@@ -116,6 +116,7 @@ Mat GetAffineTransform2f(Point2fVector src, Point2fVector dst);
 Mat FindHomography(Mat src, Mat dst, int method, double ransacReprojThreshold, Mat mask, const int maxIters, const double confidence) ;
 void DrawContours(Mat src, PointsVector contours, int contourIdx, Scalar color, int thickness);
 void DrawContoursWithParams(Mat src, PointsVector contours, int contourIdx, Scalar color, int thickness, int lineType, Mat hierarchy, int maxLevel, Point offset);
+void DrawMarker(Mat src, Point pt, Scalar color, int markerType, int markerSize, int thickness, int lineType);
 void Sobel(Mat src, Mat dst, int ddepth, int dx, int dy, int ksize, double scale, double delta, int borderType);
 void SpatialGradient(Mat src, Mat dx, Mat dy, int ksize, int borderType);
 void Remap(Mat src, Mat dst, Mat map1, Mat map2, int interpolation, int borderMode, Scalar borderValue);

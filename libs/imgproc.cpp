@@ -570,6 +570,12 @@ void DrawContoursWithParams(Mat src, PointsVector contours, int contourIdx, Scal
     cv::drawContours(*src, *contours, contourIdx, c, thickness, lineType, vecHierarchy, maxLevel, offsetPt);
 }
 
+void DrawMarker(Mat src, Point pt, Scalar color, int markerType, int markerSize, int thickness, int lineType) {
+    cv::Scalar c = cv::Scalar(color.val1, color.val2, color.val3, color.val4);
+    cv::Point cPt(pt.x, pt.y);
+    cv::drawMarker(*src, cPt, c, markerType, markerSize, thickness, lineType);
+}
+
 void Sobel(Mat src, Mat dst, int ddepth, int dx, int dy, int ksize, double scale, double delta, int borderType) {
 	cv::Sobel(*src, *dst, ddepth, dx, dy, ksize, scale, delta, borderType);
 }

@@ -119,6 +119,16 @@ pub const LineType = enum(i6) {
     line_aa = 16,
 };
 
+pub const MarkerType = enum(u3) {
+    cross,
+    tilted_cross,
+    star,
+    diamond,
+    square,
+    triangle_up,
+    triangle_down,
+};
+
 pub const HersheyFont = struct {
     /// FontItalic is the flag for italic font.
     italic: bool = false,
@@ -1346,6 +1356,10 @@ pub fn drawContoursWithParams(
         max_level,
         offset.toC(),
     );
+}
+
+pub fn drawMarker(src: *Mat, pt: Point, color: Color, marker_type: MarkerType, marker_size: i32, thickness: i32, line_type: LineType) void {
+    c.DrawMarker(src.*.ptr, pt.toC(), color.toScalar().toC(), @intFromEnum(marker_type), marker_size, thickness, @intFromEnum(line_type));
 }
 
 /// Sobel calculates the first, second, third, or mixed image derivatives using an extended Sobel operator

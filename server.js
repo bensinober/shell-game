@@ -4,6 +4,10 @@ var pendingBuffer,pendingCmd, pendingSize, pendingMode
 const httpServer = Bun.serve({
   port: 8665,
   host: "0.0.0.0",
+/*  tls: {
+    cert: Bun.file("cert.pem"),
+    key: Bun.file("key.pem"),
+  },*/
   async fetch(req, server) {
     const url = new URL(req.url);
     if (url.pathname === "/ws") {
