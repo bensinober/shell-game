@@ -16,13 +16,16 @@ wsCent.addEventListener("message", event => {
 })
 wsImg.addEventListener("message", event => {
   console.log("image")
-  const canvas = document.getElementById("imageBox")
-  const ctx = canvas.getContext("2d")
+  const snapCanvas = document.getElementById("snapBox")
+  const imgCanvas = document.getElementById("imageBox")
+  const ctxSnap = snapCanvas.getContext("2d")
+  const ctxImg = imgCanvas.getContext("2d")
   var blob = new Blob([event.data], {type: "image/png"})
   var img = new Image()
   img.onload = function (e) {
     console.log("PNG Loaded")
-    ctx.drawImage(img, imgPos[0], imgPos[1], 150, 150)
+    ctxSnap.drawImage(img, imgPos[0], imgPos[1], 150, 150)
+    ctxImg.drawImage(img, 0, 0, 640, 450)
     window.URL.revokeObjectURL(img.src)
     img = null
   }
@@ -49,7 +52,7 @@ wsImg.addEventListener("message", event => {
 var timerId
 var duration
 var imgCnt
-const buf = new ArrayBuffer(6);
+const buf = new ArrayBuffer(6)
 const dv = new DataView(buf)
 
 function startTimer() {

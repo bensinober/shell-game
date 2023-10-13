@@ -68,9 +68,9 @@ const MsgHandler = struct {
 // Result is a rect object containing scores and a class
 const Result = struct {
     id: usize,  // the result score id
-    num: usize, // the number in condensed result
     box: cv.Rect,
     centre: cv.Point,
+    prevCentre: cv.Point,
     score: f32,
     classId: usize,
     disappeared: i32 = 0,
@@ -88,13 +88,17 @@ const GameTracker = struct {
     maxLife: i32,                 // num of frames to keep disappeared objects before removing them
     objects: ArrayList(Result),   // box, centroid (x, y), scores etc.
     disappeared: ArrayList(i32),  // counter(s) for measuring disappearance
-    focusId: usize,                // The ID of Result struct containing ball - our main focus
+    focusId: usize,               // The ID of Result struct containing ball - our main focus
     timer: std.time.Timer,        // TODO: Unused timer: handled from server or browser
+    overlay: Mat,                 // empty mat to draw movements on
+    frames: f64,
+    fps: f64,
 
     pub fn init(allocator: Allocator) !Self {
         var objs: ArrayList(Result) = ArrayList(Result).init(allocator);
         var disapp: ArrayList(i32) = ArrayList(i32).init(allocator);
         var timer = try std.time.Timer.start();
+        var overlay = try cv.Mat.initOnes( 640, 640, cv.Mat.MatType.cv8uc4); // CV_8UC4 for transparency
 
         return Self{
             .maxLife = 10, // we keep a tracker alive for 10 frames, if not it is considered lost
@@ -103,6 +107,9 @@ const GameTracker = struct {
             .disappeared = disapp,
             .focusId = 0,
             .timer = timer,
+            .overlay = overlay,
+            .frames = 0,
+            .fps = 0,
         };
     }
 
@@ -125,12 +132,12 @@ const GameTracker = struct {
     }
 
     fn startTimer(self: *Self) void {
-        std.log.debug("Starting game timer\n");
+        std.debug.print("Starting game timer\n", .{});
         self.timer.reset();
     }
 
     fn getTimeSpent(self: *Self) u64 {
-        std.log.debug("getting lap time\n");
+        std.debug.print("getting lap time\n", .{});
         return self.timer.lap();
     }
 
@@ -214,15 +221,6 @@ const GameTracker = struct {
                     try self.unregister(idx);
                 }
             }
-            // var i: usize = 0;
-            // while (i < self.disappeared.items.len) : (i += 1) {
-            //     self.disappeared.items[i] += 1;
-            //     if (self.disappeared.items[i] > self.maxLife) {
-            //         std.debug.print("TRACKER LOST ALL: unregistering item {d}\n", .{i});
-            //         try self.unregister(i);
-            //         i -= 1; // need to decrease counter, as unregister mutates in-place
-            //     }
-            // }
             return;
         }
 
@@ -240,18 +238,20 @@ const GameTracker = struct {
             var rows = try allocator.alloc(f32, self.objects.items.len);
             var cols = try allocator.alloc(f32, results.items.len);
             // keep record of assigned trackers
-            var usedRows = try allocator.alloc(bool, self.objects.items.len);
-            var usedCols = try allocator.alloc(bool, results.items.len);
+
+            var usedTrackers = try allocator.alloc(bool, self.objects.items.len);
+            var usedInputs = try allocator.alloc(bool, results.items.len);
             defer allocator.free(rows);
             defer allocator.free(cols);
-            defer allocator.free(usedRows);
-            defer allocator.free(usedCols);
+            defer allocator.free(usedTrackers);
+            defer allocator.free(usedInputs);
 
-            //std.debug.print("TRACKED: {d} - INPUT: {d}\n", .{usedRows.len, usedCols.len});
+
+            //std.log.debug("TRACKED {d} INPUT: {d}\n", .{self.objects.items.len, results.items.len});
             //std.log.debug("TRACKED OBJECTS: {any}\n", .{self.objects.items});
             //std.log.debug("INPUT   OBJECTS: {any}\n", .{results.items});
 
-            // 1) calculate all euclidean distances between tracked objects and input objects
+            // 1) calculate all euclidean distances between tracked objects and ALL input objects
             // allocate a matrix for computing eucledian dist between each pair of centroids
             var mat = try allocator.alloc([]f32, self.objects.items.len);
             defer allocator.free(mat);
@@ -274,18 +274,15 @@ const GameTracker = struct {
             // 2) assign tracker to result object
             // option a) sort rows based on min distance, then sort cols based on sorted rows
             // option b) iterate tracker, choose min dist for each sequentially
-            for (self.objects.items, 0..) |_, objIdx| {
+            for (self.objects.items, 0..) |obj, objIdx| {
                 // tracker has already assigned new input
-                if (objIdx > usedCols.len - 1) {
+                if (objIdx > usedInputs.len - 1) {
                     break;
                 }
-                if (usedRows[objIdx] == true) {
+                if (usedInputs[objIdx] == true) {
                     continue;
                 }
-                if (usedCols[objIdx] == true) {
-                    continue;
-                }
-                // minimum distance from matrix of input object
+                // find the minimum distance from tracker object to matrix of input object
                 var minIdx: usize = 0;
                 for (mat[objIdx], 0..) |diff, i| {
                     if (diff < mat[objIdx][minIdx]) {
@@ -296,33 +293,42 @@ const GameTracker = struct {
                 //std.debug.print("REPLACE TRACKER: {any}\n", .{self.objects.items[objIdx]});
                 //std.debug.print("REPLACE INPUT  : {any}\n", .{results.items[minIdx]});
 
-                // OK! update GameMode if changed
+                // Now update items - unless they are too far
+                //if (mat[objIdx][minIdx] > 150) { continue; }
+
+
+                // OK! GameTrack ACTIVE: we were tracking a ball (CLASS 1), but the nearest object is no longer a ball (CLASS 0)
+                // Therefore it is most likely hidden beneath or under
                 if (self.objects.items[objIdx].classId == 1) {
-                    // We grab the nearest other object and assume it is concealing ball
+                    // We grab the nearest other object and assume it is concealing the ball
                     if (results.items[minIdx].classId != 1) {
-                        self.focusId = results.items[objIdx].id;
                         if (gameMode != GameMode.TRACK_HIDDEN) {
                             gameMode = GameMode.TRACK_HIDDEN;
-                            std.debug.print("{s} :  Ball IS NOW HIDING under cup id {d}\n", .{@tagName(gameMode), self.focusId});
+                            std.debug.print("{s} :  Ball IS NOW HIDING under cup id {d}\n", .{@tagName(gameMode), self.objects.items[objIdx].id});
                         }
                     } else {
-                        if (gameMode == GameMode.TRACK_HIDDEN) {
+                        // We were tracking a cup hiding a ball, but a ball has surfaced again, we now focus on it
+                        if (gameMode == GameMode.TRACK_HIDDEN and results.items[minIdx].classId == 1) {
                             gameMode = GameMode.TRACK_BALL;
                             std.debug.print("{s} :  Ball WAS HIDDEN under cup id {d}\n", .{@tagName(gameMode), self.focusId});
-                            self.focusId = results.items[objIdx].id;
                         }
                     }
+                    results.items[minIdx].id = obj.id; // we want to keep old id
+                    self.objects.items[objIdx] = results.items[minIdx];
+                    self.focusId = obj.id;
+                } else {
+                    // All other items
+                    results.items[minIdx].id = obj.id; // we want to keep old id
+                    self.objects.items[objIdx] = results.items[minIdx];
+                    if (results.items[minIdx].classId == 1) {
+                        self.focusId = obj.id;
+                        std.debug.print("{s} :  A new ball stole focus {d}\n", .{@tagName(gameMode), self.focusId});
+                    }
                 }
-                // Update the id of the cup hiding ball
-                if (self.objects.items[objIdx].id == self.focusId) {
-                    self.focusId = results.items[minIdx].id;
-                }
-                // And replace tracker object with least euclidean distance one
-                self.objects.items[objIdx] = results.items[minIdx];
 
-                // Mark object as handled
-                usedRows[objIdx] = true;
-                usedCols[minIdx] = true;
+                // Mark input object as handled so we dont use it again
+                usedTrackers[objIdx] = true;
+                usedInputs[minIdx] = true;
             }
 
             // for (self.objects.items, 0..) |obj, trIdx| {
@@ -375,11 +381,11 @@ const GameTracker = struct {
             //     }
             // }
 
-            // tracker objects with no matching results? increase disappeared on those NOT USED
+            // tracker objects with no matching input objects? increase disappeared on those NOT USED
             if (self.objects.items.len > results.items.len) {
                 var i: usize = 0;
                 while (i < self.objects.items.len) : (i += 1) {
-                    if (usedRows[i] == true) {
+                    if (usedTrackers[i] == true) {
                         continue;
                     }
                     //std.log.debug("Increasing tracker ID disappearance: {d}\n", .{i});
@@ -388,15 +394,15 @@ const GameTracker = struct {
                         //_ = self.objects.orderedRemove(i);
                         //_ = self.disappeared.orderedRemove(i);
                         try self.unregister(i);
-                        i -= 1; // need to decrease counter, as unregister mutates in-place
+                        //i -= 1; // need to decrease counter, as unregister mutates in-place
                     }
                 }
             }
-            // more results than tracked objects? add to tracker
+            // more input objects than tracked objects? add to tracker
             if (results.items.len > self.objects.items.len) {
                 //std.log.debug("Surplus results found: usedCols: {any}\n", .{usedCols});
                 for (results.items, 0..) |res, i| {
-                    if (usedCols[i] == true) {
+                    if (usedInputs[i] == true) {
                         continue;
                     }
                     //std.log.debug("Found new object to track:  res: {any}\n", .{res});
@@ -483,15 +489,15 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
     // 3) reduce results
     var reduced = ArrayList(Result).init(allocator);
     defer reduced.deinit();
-    for (indices.items, 0..indices.items.len) |numIndex, num| {
+    for (indices.items, 0..indices.items.len) |numIndex, _| {
         const idx: usize = @intCast(numIndex);
         //const cls: usize = @intCast(classes.items[idx]);
         //const sco = scores.items[idx];
         try reduced.append(Result{
             .id = idx,
-            .num = num,
             .box = bboxes.items[idx],
             .centre = centrs.items[idx],
+            .prevCentre = centrs.items[idx],
             .score = scores.items[idx],
             .classId = @intCast(classes.items[idx]),
         });
@@ -517,7 +523,26 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
         cv.putText(img, "+", obj.centre, cv.HersheyFont{ .type = .simplex }, 0.5, green, 1);
         cv.putText(img, lbl, cv.Point.init(obj.box.x - 10, obj.box.y - 10), cv.HersheyFont{ .type = .simplex }, 0.5, green, 1);
 
+        cv.drawMarker(&tracker.overlay, obj.centre, red, .cross, 4, 2, .filled);
     }
+
+    // add overlay traces to output img, need to convert input img to 4chan with alpha first
+    cv.cvtColor(img.*, img, .bgr_to_bgra);
+    //tracker.overlay.copyTo(img);
+    //img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
+
+    // Frames per second timing
+    tracker.frames += 1;
+    if (tracker.frames >= 60) {
+        const lap: u64 = tracker.getTimeSpent();
+        var flap: f64 = @floatFromInt(lap);
+        const secs: f64 = flap / 1000000000;
+        tracker.fps = tracker.frames / secs;
+        tracker.frames = 0;
+    }
+    var buf = [_]u8{undefined} ** 20;
+    const fpsTxt = try std.fmt.bufPrint(&buf, "FPS ({d:.2})", .{ tracker.fps });
+    cv.putText(img, fpsTxt, cv.Point.init(0,30), cv.HersheyFont{ .type = .simplex }, 0.5, green, 1);
 
     const focusObj = tracker.getFocusObj() catch |err| {
         std.debug.print("Tracker error: {any}\n", .{err});
@@ -531,12 +556,14 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
         },
         .SNAP => {
             std.debug.print("SENDING IMAGE\n", .{});
+            img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
             try tracker.sendImage(img);
             gameMode = lastGameMode;
         },
         .PREDICT => {
             if (focusObj.id == tracker.focusId) {
                 cv.rectangle(img, focusObj.box, red, 3);
+                img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
                 std.debug.print("PREDICT : CUP ID {d} FOUND!\n", .{tracker.focusId});
             } else {
                 std.debug.print("PREDICT : CUP ID {d} NOT FOUND!\n", .{tracker.focusId});
@@ -561,7 +588,7 @@ pub fn formatToSquare(src: Mat) !Mat {
     const col = src.cols();
     const row = src.rows();
     const _max = @max(col, row);
-    var res = try cv.Mat.initZeros(_max, _max, cv.Mat.MatType.cv8uc3);
+    var res = try cv.Mat.initZeros(_max, _max, cv.Mat.MatType.cv8uc4);
     src.copyTo(&res);
     return res;
 }
@@ -636,9 +663,6 @@ pub fn main() anyerror!void {
     const unconnected = try net.getUnconnectedOutLayers(allocator);
     std.debug.print("getUnconnectedOutLayers {any}\n", .{unconnected.items});
 
-    // centroid tracker to remember objects
-    var tracker = try GameTracker.init(allocator);
-    //defer tracker.deinit();
 
     // TCP SOCKET listening server
     //const serverAddr = std.net.Address.initIp4([4]u8{ 127, 0, 0, 1 }, 8667);
@@ -668,6 +692,9 @@ pub fn main() anyerror!void {
     const thread = try wsClient.readLoopInNewThread(msgHandler);
     thread.detach();
 
+    // centroid tracker to remember objects
+    var tracker = try GameTracker.init(allocator);
+    //defer tracker.deinit();
     const mean = cv.Scalar.init(0, 0, 0, 0); // mean subtraction is a technique used to aid our Convolutional Neural Networks.
     const swapRB = true;
     const crop = false;
@@ -710,6 +737,7 @@ pub fn main() anyerror!void {
         cv.Mat.transpose(probMat, &probMat);
         // yolov8 has an output of shape (batchSize, 84,  8400) (Num classes + box[x,y,w,h])
         try performDetection(&squaredImg, &probMat, rows, dims, &tracker, allocator);
+        // time frames per sec
 
         window.imShow(squaredImg);
         if (window.waitKey(1) >= 0) {
