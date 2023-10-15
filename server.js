@@ -54,15 +54,14 @@ const httpServer = Bun.serve({
         break
       case 1:
         console.log(`GAME MODE CHANGE: ${pendingMode}`)
-        ws.publish("commands", data) // we just forward message
-        //ws.publish("commands", pendingBuffer)
+        ws.publish("commands", data) // we just forward command messages
         break
       case 2:
         console.log("CENTROID DATA")
         ws.publish("centroids", pendingBuffer)
         break
       case 3:
-        console.log("IMAGE DATA")
+        //console.log("IMAGE DATA")
         ws.publish("images", pendingBuffer)
         break
       default:

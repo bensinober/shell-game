@@ -109,7 +109,18 @@ sudo ldconfig
 
 ## Bluetooth
 
+
+Bleno - for handling bluetooth BLE in backend (NOT USED - we use Web bluetooth API instead)
     sudo apt-get install libbluetooth-dev
+
+    bun add bleno@npm:@abandonware/bleno
+
+# if missing permissions for nodejs to advertise ble
+
+    (sudo setcap cap_net_raw+eip $(eval readlink -f `which node`))
+
+Device A4:06:E9:8E:00:0A HMSoft
+Device 98:D3:C1:FD:B3:95 HC-05
 
 pair animatronics device to be controlled
 Linux: pair and connect with bluetoothctl

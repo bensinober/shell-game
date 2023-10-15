@@ -21,6 +21,7 @@ pub const GameMode = enum(u8) {
     TRACK_HIDDEN,
     TRACK_IDLE,
     PREDICT,
+    VERDICT,
     _,
 
     // Probably no longer neccessary
@@ -119,14 +120,14 @@ const GameTracker = struct {
     }
 
     fn register(self: *Self, res: Result) !void {
-        std.debug.print("Registering NEW Object. {any}\n", .{res});
+        //std.debug.print("Registering NEW Object. {any}\n", .{res});
         try self.objects.append(res);
         //try self.disappeared.append(1);
     }
 
     // remove stale and disappeared objects
     fn unregister(self: *Self, id: usize) !void {
-        std.debug.print("TRACKER LOST: unregistering stale or disappeared object: {d}\n", .{id});
+        //std.debug.print("TRACKER LOST: unregistering stale or disappeared object: {d}\n", .{id});
         _ = self.objects.orderedRemove(id);
         //_ = self.disappeared.orderedRemove(id);
     }
@@ -137,7 +138,7 @@ const GameTracker = struct {
     }
 
     fn getTimeSpent(self: *Self) u64 {
-        std.debug.print("getting lap time\n", .{});
+        //std.debug.print("getting lap time\n", .{});
         return self.timer.lap();
     }
 
@@ -148,6 +149,10 @@ const GameTracker = struct {
             }
         }
         return error.MissingFocus;
+    }
+
+    fn clearOverlay(self: *Self) void {
+        return self.overlay.setTo(cv.Scalar.init(0, 0, 0, 0));
     }
 
     // send image to http server
@@ -302,7 +307,7 @@ const GameTracker = struct {
                 if (self.objects.items[objIdx].classId == 1) {
                     // We grab the nearest other object and assume it is concealing the ball
                     if (results.items[minIdx].classId != 1) {
-                        if (gameMode != GameMode.TRACK_HIDDEN) {
+                        if (gameMode == GameMode.TRACK_BALL) {
                             gameMode = GameMode.TRACK_HIDDEN;
                             std.debug.print("{s} :  Ball IS NOW HIDING under cup id {d}\n", .{@tagName(gameMode), self.objects.items[objIdx].id});
                         }
@@ -540,10 +545,14 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
         tracker.fps = tracker.frames / secs;
         tracker.frames = 0;
     }
-    var buf = [_]u8{undefined} ** 20;
-    const fpsTxt = try std.fmt.bufPrint(&buf, "FPS ({d:.2})", .{ tracker.fps });
-    cv.putText(img, fpsTxt, cv.Point.init(0,30), cv.HersheyFont{ .type = .simplex }, 0.5, green, 1);
+    var fpsBuf = [_]u8{undefined} ** 20;
+    const fpsTxt = try std.fmt.bufPrint(&fpsBuf, "FPS ({d:.2})", .{ tracker.fps });
+    cv.putText(img, fpsTxt, cv.Point.init(10,30), cv.HersheyFont{ .type = .simplex }, 0.5, green, 2);
+    var modeBuf = [_]u8{undefined} ** 14;
+    const modeTxt = try std.fmt.bufPrint(&modeBuf, "{s}", .{ @tagName(gameMode) });
+    cv.putText(img, modeTxt, cv.Point.init(10,620), cv.HersheyFont{ .type = .simplex }, 0.5, green, 2);
 
+    // TODO: is this neccessary? we should always have a focus object
     const focusObj = tracker.getFocusObj() catch |err| {
         std.debug.print("Tracker error: {any}\n", .{err});
         return;
@@ -562,7 +571,7 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
         },
         .PREDICT => {
             if (focusObj.id == tracker.focusId) {
-                cv.rectangle(img, focusObj.box, red, 3);
+                cv.rectangle(img, focusObj.box, red, 5);
                 img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
                 std.debug.print("PREDICT : CUP ID {d} FOUND!\n", .{tracker.focusId});
             } else {
@@ -570,6 +579,7 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
             }
             gameMode = lastGameMode;
             try tracker.sendImage(img);
+            tracker.clearOverlay();
         },
         else => {
             std.debug.print("Centroid: {any}\n", .{focusObj.centre});
@@ -655,8 +665,8 @@ pub fn main() anyerror!void {
         std.os.exit(1);
     }
 
-    net.setPreferableBackend(.default);
-    net.setPreferableTarget(.cpu);
+    net.setPreferableBackend(.default);  // .default, .halide, .open_vino, .open_cv. .vkcom, .cuda
+    net.setPreferableTarget(.fp16);       // .cpu, .fp32, .fp16, .vpu, .vulkan, .fpga, .cuda, .cuda_fp16
 
     var layers = try net.getLayerNames(allocator);
     std.debug.print("getLayerNames {any}\n", .{layers.len});

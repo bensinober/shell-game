@@ -21,12 +21,21 @@ body {
 }
 #NW { top:0;    left:0; padding: 2rem; margin: 1rem;}
 #NE { top:0;    left:50%; background:black; }
-#SW { top:50%;  left:0;   background:black; }
-#SE { top:50%;  left:50%; background:white; }
+#SW { top:50%;  left:0;   background:transparent; }
+#SE { top:50%;  left:50%; }
 
-.countdownTimer { font-family: "Orbitron", sans-serif; font-size: 3rem; font-weight: bold; color: red; margin-top: 100px;}
+.countdownTimer {
+  font-family: "Orbitron", sans-serif;
+  font-size: 12rem;
+  font-weight: bold;
+  color: red;
+}
+#gameMode {
+  font-family: 'Blade Runner Movie Font', sans-serif; font-size: 24px;
+}
 
 .buttons { display: flex; flex-wrap: wrap; justify-content: space-around; }
+
 .arcade-button {
   position: relative;
   cursor: pointer;
