@@ -44,6 +44,17 @@ Run server
 
     bun run server.js
 
+
+### OpenVino Inference backend (not working with zig)
+
+    git clone https://github.com/openvinotoolkit/openvino.git
+    cd openvino && mkdir build && cd build
+    CC="zig cc" CXX="zig c++" CMAKE_CXX_FLAGS="" cmake -DCMAKE_BUILD_TYPE=Release ..
+    make -j8
+
+docker run -itu root:root  --rm --device /dev/dri:/dev/dri openvino/ubuntu22_dev:latest
+/bin/bash -c "omz_downloader --name googlenet-v1 --precisions FP16 && omz_converter --name googlenet-v1 --precision FP16 && curl -O https://storage.openvinotoolkit.org/data/test_data/images/car_1.bmp && python3 samples/python/hello_classification/hello_classification.py public/googlenet-v1/FP16/googlenet-v1.xml car_1.bmp GPU"
+
 ## OpenCV install
 
     sudo apt-get install -y --no-install-recommends make cmake unzip git \
@@ -71,9 +82,12 @@ CC="zig cc" CXX="zig c++" cmake \
     -D WITH_IPP=OFF \
     -D WITH_OPENGL=OFF \
     -D WITH_QT=OFF \
+    -D WITH_OPENVINO=OFF \
     -D CMAKE_INSTALL_PREFIX=/usr/local \
+    -D OPENCV_DNN_OPENCL=ON \
     -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib/modules/ \
     -D OPENCV_ENABLE_NONFREE=ON \
+    -D OPENCV_GAPI_ONNX_MODEL_PATH=ON \
     -D WITH_JASPER=OFF \
     -D WITH_TBB=ON \
     -D BUILD_DOCS=OFF \
