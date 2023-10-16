@@ -1,0 +1,134 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="914mm"
+   height="610mm"
+   viewBox="0 0 914 610"
+   version="1.1"
+   id="SVGRoot"
+   sodipodi:docname="cup-shuffler.svg"
+   inkscape:version="1.1.2 (0a00cf5339, 2022-02-04)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview338"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:pageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:document-units="mm"
+     showgrid="false"
+     inkscape:zoom="0.33589188"
+     inkscape:cx="954.1761"
+     inkscape:cy="949.71037"
+     inkscape:window-width="1916"
+     inkscape:window-height="1161"
+     inkscape:window-x="0"
+     inkscape:window-y="18"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="layer1"
+     inkscape:snap-grids="true"
+     width="900mm" />
+  <defs
+     id="defs333">
+    <rect
+       x="158.72214"
+       y="1575.2426"
+       width="852.92661"
+       height="688.96857"
+       id="rect11304" />
+    <rect
+       x="-902.74724"
+       y="1509.4172"
+       width="201.52355"
+       height="748.22334"
+       id="rect7346" />
+  </defs>
+  <g
+     inkscape:label="Layer 1"
+     inkscape:groupmode="layer"
+     id="layer1">
+    <rect
+       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.258865"
+       id="rect388"
+       width="250"
+       height="130"
+       x="6.0208654"
+       y="5.5383916" />
+    <rect
+       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.335219"
+       id="rect388-2"
+       width="250"
+       height="218"
+       x="6.4573479"
+       y="142.03639" />
+    <rect
+       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.335219"
+       id="rect388-2-0"
+       width="250"
+       height="218"
+       x="6.1711197"
+       y="367.62656" />
+    <rect
+       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.276472"
+       id="rect671"
+       width="130"
+       height="218"
+       x="263.74304"
+       y="366.91885" />
+    <rect
+       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.276472"
+       id="rect671-8"
+       width="130"
+       height="218"
+       x="263.60962"
+       y="5.892663" />
+    <rect
+       style="fill:#ff0000;fill-rule:evenodd;stroke-width:0.165492"
+       id="rect1099"
+       width="70"
+       height="95"
+       x="96.17112"
+       y="449.69659" />
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:10.5833px;line-height:1.25;font-family:'Blade Runner Movie Font';fill:#000000;fill-opacity:1;stroke:none;stroke-width:0.264583;-inkscape-font-specification:'Blade Runner Movie Font';font-stretch:normal;font-variant:normal"
+       x="-363.72208"
+       y="135.40584"
+       id="text2666"><tspan
+         sodipodi:role="line"
+         id="tspan2664"
+         style="stroke-width:0.264583;-inkscape-font-specification:'Blade Runner Movie Font';font-family:'Blade Runner Movie Font';font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal"></tspan></text>
+    <text
+       xml:space="preserve"
+       style="font-style:normal;font-weight:normal;font-size:19.7556px;line-height:1.25;font-family:sans-serif;fill:#ffff00;fill-opacity:1;stroke:none;stroke-width:0.264583"
+       x="242.72942"
+       y="393.93143"
+       id="text5068"><tspan
+         sodipodi:role="line"
+         id="tspan5066"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end;fill:#ffff00;stroke-width:0.264583"
+         x="242.72942"
+         y="393.93143">shell game</tspan><tspan
+         sodipodi:role="line"
+         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end;fill:#ffff00;stroke-width:0.264583"
+         x="242.72942"
+         y="419.21652"
+         id="tspan16456">shuffler</tspan></text>
+    <text
+       xml:space="preserve"
+       transform="scale(0.26458333)"
+       id="text7344"
+       style="fill:#ff0000;fill-opacity:1;line-height:1.25;stroke:none;font-family:sans-serif;font-style:normal;font-weight:normal;font-size:40px;white-space:pre;shape-inside:url(#rect7346)" />
+    <text
+       xml:space="preserve"
+       transform="scale(0.26458333)"
+       id="text11302"
+       style="fill:black;fill-opacity:1;line-height:1.25;stroke:none;font-family:sans-serif;font-style:normal;font-weight:normal;font-size:40px;white-space:pre;shape-inside:url(#rect11304)" />
+  </g>
+</svg>
