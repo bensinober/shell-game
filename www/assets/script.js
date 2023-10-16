@@ -10,6 +10,7 @@ var predictSeq = ""
 var timerId
 var duration
 var slideCnt = 0
+var uuid
 const cmdBuf = new ArrayBuffer(6)
 const dvCmd = new DataView(cmdBuf)
 dvCmd.setUint8(0, 1) // command
@@ -134,7 +135,6 @@ ws.addEventListener("message", async event => {
     break
   case 9:
     console.log("stats")
-    var uuid = Math.random().toString(36).slice(-10)
     const slideCanvas = document.getElementById("slideBox")
     const predictCanvas = document.getElementById("predictBox")
 
@@ -177,6 +177,10 @@ ws.addEventListener("message", async event => {
   }
 })
 
+function genUUID() {
+  return Math.random().toString(36).slice(-10)
+}
+
 function clearData() {
   const slideCanvas = document.getElementById("slideBox")
   const predictCanvas = document.getElementById("predictBox")
@@ -189,6 +193,7 @@ function clearData() {
   predictLetter = centroidToLetter(centroid)
   verdictLetter = centroidToLetter(centroid)
   predictSeq = ""
+  uuid = genUUID()
   dvCmd.setUint8(1, 4) // GameMode.TRACK_BALL
   ws.send(new Uint8Array(cmdBuf))
 }

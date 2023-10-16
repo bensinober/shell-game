@@ -30,8 +30,14 @@ const httpServer = Bun.serve({
       try {
         const json = await req.json()
         const { uuid, rect, centr, score} = json
-        db.query(`INSERT INTO stats (uuid,boxx,boxy,boxw,boxh,centx,centy,score) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?8)`)
-          .run(uuid, rect.x, rect.y, rect.w, rect.h, centr.x, centr.y, score)
+        const exists = db.query(`SELECT * FROM stats WHERE uuid=?1`).get(uuid)
+        if (exists) {
+          db.query(`UPDATE stats SET boxx=?1, boxy=?2, boxw=?3, boxh=?4, centx=?5, centy=?6, score=?7 WHERE uuid = ?8`)
+            .run(rect.x, rect.y, rect.w, rect.h, centr.x, centr.y, score, uuid)
+        } else {
+          db.query(`INSERT INTO stats (uuid,boxx,boxy,boxw,boxh,centx,centy,score) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?8)`)
+            .run(uuid, rect.x, rect.y, rect.w, rect.h, centr.x, centr.y, score)
+          }
         return new Response("OK")
       } catch(err) {
         console.log(err)
