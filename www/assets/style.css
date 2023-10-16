@@ -19,9 +19,9 @@ body {
   width:50%;
   height:50%;  /* gives quarters their size */
 }
-#NW { top:0;    left:0; padding: 2rem; margin: 1rem;}
+#NW { top:0;    left:0;   padding: 1rem; margin: 1rem;}
 #NE { top:0;    left:50%; background:black; }
-#SW { top:50%;  left:0;   background:transparent; }
+#SW { top:50%;  left:0;   padding: 1em; background:transparent; }
 #SE { top:50%;  left:50%; }
 
 .countdownTimer {
@@ -39,9 +39,9 @@ body {
 .arcade-button {
   position: relative;
   cursor: pointer;
-  width: 120px;
-  height: 120px;
-  font-size: 30px;
+  width: 100px;
+  height: 100px;
+  font-size: 24px;
   -moz-border-radius: 60px;
   -webkit-border-radius: 60px;
   border-radius: 60px;
@@ -93,8 +93,8 @@ body {
   margin: 0;
   padding: 20px;
   background: #f20352;
-  width: 120px;
-  height: 120px;
+  width: 100px;
+  height: 100px;
   -moz-border-radius: 80px;
   -webkit-border-radius: 80px;
   border-radius: 80px;

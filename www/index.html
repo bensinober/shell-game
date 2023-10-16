@@ -18,23 +18,23 @@
       <div class="buttons">
         <button id="startBtn" class="arcade-button">Start</button>
         <button id="predictBtn" class="arcade-button">Pred</button>
+        <button id="verdictBtn" class="arcade-button">Verd</button>
         <button id="eyesBtn" class="arcade-button">Øyne</button>
         <!--<button id="sendCentBtn" class="arcade-button">Send Centr</button>-->
       </div>
       <div>
-        <div class="countdownTimer"></div>
         <div class="centroid">150,150</div>
-        <div id="gameMode"></div>
       </div>
     </div>
     <div class="quarter" id="NE">
       <canvas id="slideBox" width="950" height="450"></canvas>
     </div>
     <div class="quarter" id="SE">
-      <canvas id="predictBox" width="950" height="450"></canvas>
+      <div id="gameMode"></div>
+      <div class="countdownTimer"></div>
     </div>
     <div class="quarter" id="SW">
-      <canvas id="traceBox" width="950" height="450"></canvas>
+      <canvas id="predictBox" width="900" height="450"></canvas>
     </div>
   </div>
   <script type="module" src="assets/script.js"></script>

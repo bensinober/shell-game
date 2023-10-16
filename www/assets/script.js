@@ -1,70 +1,12 @@
 /* shell game javascript */
 
 const GameModes = ["IDLE","START","STOP","SNAP","TRACK_BALL","TRACK_HIDDEN","TRACK_IDLE","PREDICT","VERDICT"]
+const eyesActive = false
 var gameMode = GameModes[0]
 var imgPos = [-150, 0] // don't know why we need to start negative offset, but hey, javascript
-
-// websockets
-const wsCmd = new WebSocket("ws://localhost:8665/ws?channels=commands")
-const wsCent = new WebSocket("ws://localhost:8665/ws?channels=centroids")
-const wsImg = new WebSocket("ws://localhost:8665/ws?channels=images")
-wsCmd.addEventListener("message", event => {
-  console.log(event.data)
-  const { data } = event
-  const cmd = data.getUint8(0)
-  const mode = data.getUint8(1)
-  gameMode = GameModes[parseInt(mode, 10)]
-  document.getElementById("gameMode").innerTEXT = gameMode
-})
-//wsCent.addEventListener("open", event => wsCent.binaryType = "arraybuffer")
-wsCent.addEventListener("message", event => {
-  if (event.data.byteLength === 8) {
-    const [x, y] = new Int32Array(event.data)
-    console.log(event.data)
-    const div = document.querySelector(".centroid")
-    div.innerHTML = `${x},${y}`
-    writeToEyes(x, y)
-  }
-})
-wsImg.addEventListener("message", event => {
-  console.log("image", gameMode)
-  const slideCanvas = document.getElementById("slideBox")
-  const traceCanvas = document.getElementById("traceBox")
-  const ctxSlides = slideCanvas.getContext("2d")
-  const ctxTrace = traceCanvas.getContext("2d")
-  var blob = new Blob([event.data], {type: "image/png"})
-  var img = new Image()
-  img.onload = function (e) {
-    console.log("PNG Loaded")
-    ctxSlides.drawImage(img, imgPos[0], imgPos[1], 150, 150)
-    if (gameMode = GameModes[7]) {
-      ctxTrace.drawImage(img, 450, 450, 450, 450)
-    } else {
-      ctxTrace.drawImage(img, 0, 0, 450, 450)
-    }
-    window.URL.revokeObjectURL(img.src)
-    img = null
-  }
-  img.onerror = img.onabort = function () {
-    img = null
-    console.log("error loading image")
-    return
-  }
-  img.src = window.URL.createObjectURL(blob)
-  // move canvas image position for next image
-  imgPos[0] += 150
-  if (imgPos[0] >= 900) {
-    imgPos[0] = 0
-    imgPos[1] += 150
-    if (imgPos[1] >= 450) {
-      imgPos[1] = 0
-    }
-  }
-})
-
-
-// simple countdown timer
-// one game = 18 secs
+var centroid = {x: 320, y: 240}
+var predictLetter, verdictLetter
+var predictSeq = ""
 var timerId
 var duration
 var slideCnt = 0
@@ -73,12 +15,189 @@ const dvCmd = new DataView(cmdBuf)
 dvCmd.setUint8(0, 1) // command
 dvCmd.setInt32(2, 0, true) // command length 0, little endian
 
-function startTimer() {
-  dvCmd.setUint8(1, 6) // GameMode.TRACK_IDLE
-  wsCmd.send(new Uint8Array(cmdBuf))
-  duration = 18
-  slideCnt = 0
+function centroidToLetter(centroid) {
+  if (centroid.x < 220) {
+    return "A"
+  } else if (centroid.x > 421) {
+    return "C"
+  } else {
+    return "B"
+  }
+}
 
+// INPUT FROM WEBSOCKETS
+const ws = new WebSocket("ws://localhost:8665/ws?channels=shell-game")
+ws.addEventListener("open", event => ws.binaryType = "arraybuffer")
+ws.addEventListener("message", async event => {
+  //console.log(`INCOMING: ${event.data}`)
+  const dv = new DataView(event.data);
+  const cmd = dv.getUint8(0)
+  const mode = dv.getUint8(1)
+  const len = dv.getInt32(2, true)
+  const data = event.data.slice(6)
+  const slideCanvas = document.getElementById("slideBox")
+  const predictCanvas = document.getElementById("predictBox")
+  const ctxSlides = slideCanvas.getContext("2d")
+  const ctxTrace = predictCanvas.getContext("2d")
+  //console.log(cmd,mode,len, data)
+  // Game Mode
+  gameMode = GameModes[parseInt(mode, 10)]
+  document.getElementById("gameMode").innerHTML = gameMode.toLowerCase()
+
+  switch (cmd) {
+  case 0:
+    //console.log(`echo cmd res: ${data}`)
+    break
+  case 1:
+    console.log("game mode change")
+    break
+  case 2:
+    // centroid
+    console.log("centroid")
+    const x = dv.getInt32(6, true)
+    const y = dv.getInt32(10, true)
+    centroid = {x, y}
+    const div = document.querySelector(".centroid")
+    div.innerHTML = `${x},${y}`
+    if (eyesActive) {
+      writeToEyes(x, y)
+    }
+    break
+  case 3:
+    console.log("snap")
+    // update gameSeq
+    predictLetter = centroidToLetter(centroid)
+    predictSeq += predictLetter
+    var blob = new Blob([data], {type: "image/png"})
+    var img = new Image()
+    img.onload = function (e) {
+      console.log("PNG Loaded")
+      ctxSlides.drawImage(img, imgPos[0], imgPos[1], 150, 150)
+      window.URL.revokeObjectURL(img.src)
+      img = null
+    }
+    img.onerror = img.onabort = function () {
+      img = null
+      console.log("error loading image")
+      return
+    }
+    img.src = window.URL.createObjectURL(blob)
+    // move canvas image position for next image
+    imgPos[0] += 150
+    if (imgPos[0] >= 900) {
+      imgPos[0] = 0
+      imgPos[1] += 150
+      if (imgPos[1] >= 450) {
+        imgPos[1] = 0
+      }
+    }
+    break
+  case 4:
+    console.log("dunno")
+    break
+  case 7:
+    console.log("predict")
+    // TODO: send to web service here for prediction?
+    predictLetter = centroidToLetter(centroid)
+    var blob = new Blob([data], {type: "image/png"})
+    var img = new Image()
+    img.onload = function (e) {
+      console.log("PNG Loaded")
+      ctxTrace.drawImage(img, 0, 0, 450, 450)
+      window.URL.revokeObjectURL(img.src)
+      img = null
+    }
+    img.onerror = img.onabort = function () {
+      img = null
+      console.log("error loading image")
+      return
+    }
+    img.src = window.URL.createObjectURL(blob)
+    break
+  case 8:
+    console.log("verdict")
+    verdictLetter = centroidToLetter(centroid)
+    var blob = new Blob([data], {type: "image/png"})
+    var img = new Image()
+    img.onload = function (e) {
+      console.log("PNG Loaded")
+      ctxTrace.drawImage(img, 450, 0, 450, 450)
+      window.URL.revokeObjectURL(img.src)
+      img = null
+    }
+    img.onerror = img.onabort = function () {
+      img = null
+      console.log("error loading image")
+      return
+    }
+    img.src = window.URL.createObjectURL(blob)
+    break
+  case 9:
+    console.log("stats")
+    var uuid = Math.random().toString(36).slice(-10)
+    const slideCanvas = document.getElementById("slideBox")
+    const predictCanvas = document.getElementById("predictBox")
+
+    const rect = {
+      x: dv.getInt32(6, true),
+      y: dv.getInt32(10, true),
+      w: dv.getInt32(14, true),
+      h: dv.getInt32(18, true),
+    }
+    const centr = {
+      x: dv.getInt32(22, true),
+      y: dv.getInt32(26, true)
+    }
+    const score = dv.getFloat32(30, true)
+    await fetch("/api/stats", {
+      headers: { "Accept": "application/json", "Content-Type": "application/json" },
+      method: "POST",
+      body: JSON.stringify({uuid, rect, centr, score})
+    })
+    await slideCanvas.toBlob(blob => {
+      let formData = new FormData()
+      formData.append("uuid", uuid)
+      formData.append("image", blob, "slide.png")
+      fetch("/api/slideimg", { method: "POST", body: formData })
+    })
+    await predictCanvas.toBlob(blob => {
+      let formData = new FormData()
+      formData.append("uuid", uuid)
+      formData.append("image", blob, "predict.png")
+      fetch("/api/predictimg", { method: "POST", body: formData })
+    })
+    await fetch("/api/verdict", {
+      headers: { "Accept": "application/json", "Content-Type": "application/json" },
+      method: "POST",
+      body: JSON.stringify({predictSeq, predictLetter, verdictLetter, uuid})
+    })
+    break
+  default:
+    console.log(`unknow CMD: ${cmd}`)
+  }
+})
+
+function clearData() {
+  const slideCanvas = document.getElementById("slideBox")
+  const predictCanvas = document.getElementById("predictBox")
+  const ctxSlides = slideCanvas.getContext("2d")
+  const ctxTrace = predictCanvas.getContext("2d")
+  ctxSlides.clearRect(0, 0, slideCanvas.width, slideCanvas.height)
+  ctxTrace.clearRect(0, 0, predictCanvas.width, predictCanvas.height)
+  imgPos = [-150, 0] // don't know why we need to start negative offset, but hey, javascript
+  centroid = {x: 320, y: 240}
+  predictLetter = centroidToLetter(centroid)
+  verdictLetter = centroidToLetter(centroid)
+  predictSeq = ""
+  dvCmd.setUint8(1, 4) // GameMode.TRACK_BALL
+  ws.send(new Uint8Array(cmdBuf))
+}
+
+// simple countdown timer
+function startTimer() {
+  clearData()
+  duration = 18 // one game = 18 secs
+  slideCnt = 0
   timerId = setInterval(function (evt) {
     if(duration <= 0) {
       clearInterval(timerId)
@@ -86,7 +205,7 @@ function startTimer() {
     } else {
       document.querySelector(".countdownTimer").innerHTML = "00:" + duration.toString().padStart(2, "0")
       dvCmd.setUint8(1, 3) // GameMode.SNAP
-      wsCmd.send(new Uint8Array(cmdBuf))
+      ws.send(new Uint8Array(cmdBuf))
     }
     duration -= 1
     slideCnt += 1
@@ -98,9 +217,14 @@ document.getElementById("startBtn").addEventListener("click", startTimer)
 document.getElementById("predictBtn").addEventListener("click", function(evt) {
   console.log("PREDICT")
   dvCmd.setUint8(1, 7) // GameMode.PREDICT
-  wsCmd.send(new Uint8Array(cmdBuf))
+  ws.send(new Uint8Array(cmdBuf))
 })
 
+document.getElementById("verdictBtn").addEventListener("click", function(evt) {
+  console.log("VERDICT")
+  dvCmd.setUint8(1, 8) // GameMode.VERDICT
+  ws.send(new Uint8Array(cmdBuf))
+})
 // WEB Bluetooth API
 /*
 Instead, they provide only one characteristic that emulates a serial port, and everything you write down there, module will send to your controller via TX,
@@ -125,9 +249,9 @@ document.getElementById("eyesBtn").addEventListener("click", async function(evt)
 
 // transpond x, y (640,640) to u8 (255,255)
 async function writeToEyes(x, y) {
-    const x1 = Math.round(Math.abs((640 - x) / 640 * 255)) // invert x-axis
+    const x1 = Math.round(x / 640 * 255)
+    //const x1 = Math.round(Math.abs((640 - x) / 640 * 255)) // invert x-axis
     const y1  =Math.round(Math.abs((640 - y) / 640 * 50)) // invert and compress y-axis
-    //const y1 = Math.round(y / 640 * 255)
     const cmd = new Uint8Array([ 0, 2, x1, y1 ])
     await btCharacteristic.writeValueWithoutResponse(cmd);
     //console.log(`in: (${x}, ${y}) -- written (${x1}, ${y1})`)

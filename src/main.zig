@@ -44,24 +44,25 @@ var wsClient: websocket.Client = undefined;     // Websocket client
 const MsgHandler = struct {
     allocator: Allocator,
 
+    // Handle Commands via websocket
     pub fn handle(self: MsgHandler, msg: websocket.Message) !void {
         std.log.debug("got msg: {any}", .{msg.data});
-        //const mode = GameMode.str2enum(msg.data);
         if (msg.data[0] == 1) {
             const mode: GameMode = @enumFromInt(msg.data[1]);
             lastGameMode = gameMode;
             gameMode = mode;
+            var mb: u8 = std.mem.asBytes(&gameMode)[0];
             std.log.debug("switched mode from: {any} to {any}", .{lastGameMode, gameMode});
             const res = try self.allocator.alloc(u8, 8);
-            @memcpy(res, &[_]u8{0, 0, 2, 0, 0, 0, 0x4f, 0x4b}); // OK
+            @memcpy(res, &[_]u8{0, mb, 2, 0, 0, 0, 0x4f, 0x4b}); // OK
             _ = try wsClient.writeBin(res);
         } else {
             const res = try self.allocator.alloc(u8, 9);
-            @memcpy(res, &[_]u8{0, 0, 2, 0, 0, 0, 0x4e, 0x4f, 0x4b}); // NOK
+            var mb: u8 = std.mem.asBytes(&gameMode)[0];
+            @memcpy(res, &[_]u8{0, mb, 2, 0, 0, 0, 0x4e, 0x4f, 0x4b}); // NOK
             _ = try wsClient.write(res);
         }
     }
-
     pub fn close(_: MsgHandler) void {
     }
 };
@@ -90,6 +91,7 @@ const GameTracker = struct {
     objects: ArrayList(Result),   // box, centroid (x, y), scores etc.
     disappeared: ArrayList(i32),  // counter(s) for measuring disappearance
     focusId: usize,               // The ID of Result struct containing ball - our main focus
+    lastFocusObj: ?Result,         // The Result struct of LAST KNOWN GOOD focus - failover even if lost/disappeared
     timer: std.time.Timer,        // TODO: Unused timer: handled from server or browser
     overlay: Mat,                 // empty mat to draw movements on
     frames: f64,
@@ -107,6 +109,7 @@ const GameTracker = struct {
             .objects = objs,
             .disappeared = disapp,
             .focusId = 0,
+            .lastFocusObj = undefined,
             .timer = timer,
             .overlay = overlay,
             .frames = 0,
@@ -142,13 +145,18 @@ const GameTracker = struct {
         return self.timer.lap();
     }
 
-    fn getFocusObj(self: Self) !Result {
+    fn getFocusObj(self: Self) ?Result {
         for (self.objects.items) |obj| {
             if (obj.id == self.focusId) {
                 return obj;
             }
         }
-        return error.MissingFocus;
+        // failover object if lost focus
+        if (self.lastFocusObj) | obj| {
+            std.debug.print("getFocusObj : LOST OBJECT, TRYING LAST KNOWN FOCUS ID {d}!\n", .{obj.id});
+            return obj;
+        }
+        return null;
     }
 
     fn clearOverlay(self: *Self) void {
@@ -184,9 +192,9 @@ const GameTracker = struct {
             return err;
         };
         defer bs.deinit();
+        const cmd: u8 = @intFromEnum(gameMode);
         const len: i32 = @intCast(bs.items.len);
         std.debug.print("Image length: {d}\n", .{len});
-        var cmd: u8 = 3;
         _ = try bs.insert(0, cmd);
         _ = try bs.insertSlice(1, std.mem.asBytes(&gameMode));
         _ = try bs.insertSlice(2, std.mem.asBytes(&len));
@@ -210,6 +218,20 @@ const GameTracker = struct {
         _ = try wsClient.writeBin(&buf);
     }
 
+    // send stats to websocket
+    fn sendStats(_: Self, r: Result) !void {
+        var buf = [_]u8{0} ** 40;
+        const len: i32 = @intCast(8);
+        var wr = std.io.fixedBufferStream(&buf);
+        _ = try wr.write(&[_]u8{0x09}); // cmd 9    = send stats
+        _ = try wr.write(std.mem.asBytes(&gameMode));
+        _ = try wr.write(std.mem.asBytes(&len)); // length
+        _ = try wr.write(std.mem.asBytes(&r.box)); // bounding box 4 x i32
+        _ = try wr.write(std.mem.asBytes(&r.centre)); // x,y 2 x i32
+        _ = try wr.write(std.mem.asBytes(&r.score)); // score f32
+        //_ = try client.write(&buf);
+        _ = try wsClient.writeBin(&buf);
+    }
 
     // input: rects of discovered boxes for updating tracker and watching for
     // disappearances by an incrementing counter
@@ -321,12 +343,14 @@ const GameTracker = struct {
                     results.items[minIdx].id = obj.id; // we want to keep old id
                     self.objects.items[objIdx] = results.items[minIdx];
                     self.focusId = obj.id;
+                    self.lastFocusObj = self.objects.items[objIdx];
                 } else {
                     // All other items
                     results.items[minIdx].id = obj.id; // we want to keep old id
                     self.objects.items[objIdx] = results.items[minIdx];
                     if (results.items[minIdx].classId == 1) {
                         self.focusId = obj.id;
+                        self.lastFocusObj = self.objects.items[objIdx];
                         std.debug.print("{s} :  A new ball stole focus {d}\n", .{@tagName(gameMode), self.focusId});
                     }
                 }
@@ -520,6 +544,7 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
     for (tracker.objects.items) |obj| {
         if (obj.classId == 1) { // class 1: a ball! we return focus
             tracker.focusId = obj.id;
+            tracker.lastFocusObj = obj;
             cv.arrowedLine(img, cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 50), cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 30), green, 4);
         }
         var buf = [_]u8{undefined} ** 40;
@@ -552,16 +577,18 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
     const modeTxt = try std.fmt.bufPrint(&modeBuf, "{s}", .{ @tagName(gameMode) });
     cv.putText(img, modeTxt, cv.Point.init(10,620), cv.HersheyFont{ .type = .simplex }, 0.5, green, 2);
 
+    const focusObj = tracker.getFocusObj();
     // TODO: is this neccessary? we should always have a focus object
-    const focusObj = tracker.getFocusObj() catch |err| {
-        std.debug.print("Tracker error: {any}\n", .{err});
-        return;
-    };
+    // const focusObj = tracker.getFocusObj() catch |err| {
+    //     std.debug.print("Tracker error: {any}\n", .{err});
+    // };
 
     // Now see if we have pending modes
     switch (gameMode) {
-        .TRACK_BALL, .TRACK_HIDDEN, .TRACK_IDLE => {
-            try tracker.sendCentroid(focusObj.centre);
+        .IDLE, .TRACK_BALL, .TRACK_HIDDEN, .TRACK_IDLE => {
+            if (focusObj) |obj| {
+                try tracker.sendCentroid(obj.centre);
+            }
         },
         .SNAP => {
             std.debug.print("SENDING IMAGE\n", .{});
@@ -570,19 +597,41 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
             gameMode = lastGameMode;
         },
         .PREDICT => {
-            if (focusObj.id == tracker.focusId) {
-                cv.rectangle(img, focusObj.box, red, 5);
-                img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
-                std.debug.print("PREDICT : CUP ID {d} FOUND!\n", .{tracker.focusId});
-            } else {
-                std.debug.print("PREDICT : CUP ID {d} NOT FOUND!\n", .{tracker.focusId});
+            if (focusObj) |obj| {
+                if (obj.id == tracker.focusId) {
+                    cv.rectangle(img, obj.box, red, 5);
+                    img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
+                    std.debug.print("PREDICT : CUP ID {d} FOUND!\n", .{tracker.focusId});
+                } else {
+                    std.debug.print("PREDICT : CUP ID {d} NOT FOUND!\n", .{tracker.focusId});
+                }
             }
-            gameMode = lastGameMode;
+
+            img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
             try tracker.sendImage(img);
+            gameMode = lastGameMode;
+        },
+        .VERDICT => {
+            if (focusObj) |obj| {
+                if (obj.id == tracker.focusId) {
+                    cv.rectangle(img, obj.box, red, 5);
+                    img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
+                    std.debug.print("VERDICT : CUP ID {d} FOUND!\n", .{tracker.focusId});
+                } else {
+                    std.debug.print("VERDICT : CUP ID {d} NOT FOUND!\n", .{tracker.focusId});
+                }
+            }
+            try tracker.sendImage(img);
+            if (focusObj) |obj| {
+                try tracker.sendStats(obj);
+            }
             tracker.clearOverlay();
+            gameMode = GameMode.IDLE;
         },
         else => {
-            std.debug.print("Centroid: {any}\n", .{focusObj.centre});
+            if (focusObj) |obj| {
+                std.debug.print("Centroid: {any}\n", .{obj.centre});
+            }
         },
     }
 }
@@ -642,7 +691,6 @@ pub fn main() anyerror!void {
     //var img = try cv.Mat.initSize(640,640, cv.Mat.MatType.cv8uc3);
 
     // open DNN object tracking model
-    // pytorch
     const scale: f64 = 1.0 / 255.0;
     const size: cv.Size = cv.Size.init(640, 640);
     var net = cv.Net.readNetFromONNX(model) catch |err| {
@@ -694,7 +742,7 @@ pub fn main() anyerror!void {
     wsClient = try websocket.connect(allocator, "localhost", 8665, .{});
     defer wsClient.deinit();
 
-    try wsClient.handshake("/ws?channels=commands,images,centroids", .{
+    try wsClient.handshake("/ws?channels=shell-game", .{
          .timeout_ms = 5000,
          .headers = "host: localhost:8665\r\n",
     });
@@ -718,6 +766,7 @@ pub fn main() anyerror!void {
             continue;
         }
 
+        img.flip(&img, 1); // flip horizontally
         var squaredImg = try formatToSquare(img);
         defer squaredImg.deinit();
         cv.resize(squaredImg, &squaredImg, size, 0, 0, .{});

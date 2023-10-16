@@ -34,6 +34,11 @@ Main application
 
     zig-out/bin/shell-game [camera id] [.onnx model file]
 
+
+### Run with OpenCL (Intel GPU)
+
+    OPENCV_DNN_OPENCL_ALLOW_ALL_DEVICES=1 zig-out/bin/shell-game [camera id] [.onnx model file]
+
 ## Web application and server (websocket)
 
 Install bun (local user, on linux ~/.bun/bin/bun):

@@ -1,4 +1,7 @@
 // Bun server with websocket and static file serving
+import { Database } from "bun:sqlite"
+const db = new Database("shell-game.db")
+db.exec("PRAGMA journal_mode = WAL;")
 const BASE_PATH = "./www"
 var pendingBuffer,pendingCmd, pendingSize, pendingMode
 const httpServer = Bun.serve({
@@ -10,17 +13,74 @@ const httpServer = Bun.serve({
   },*/
   async fetch(req, server) {
     const url = new URL(req.url);
-    if (url.pathname === "/ws") {
+    switch (url.pathname) {
+    case "/ws":
       // ws upgrade logic and channels subscription
       // valid channels are: commands, centroids, images
-      const channels = new URL(req.url).searchParams.get("channels").split(",")
+      const channel = new URL(req.url).searchParams.get("channels")
       return server.upgrade(req, {
         data: {
           createdAt: Date.now(),
-          channels: channels,
+          channels: [channel],
         }
       })
-    } else {
+      break
+
+    case "/api/stats":
+      try {
+        const json = await req.json()
+        const { uuid, rect, centr, score} = json
+        db.query(`INSERT INTO stats (uuid,boxx,boxy,boxw,boxh,centx,centy,score) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?6, ?8)`)
+          .run(uuid, rect.x, rect.y, rect.w, rect.h, centr.x, centr.y, score)
+        return new Response("OK")
+      } catch(err) {
+        console.log(err)
+      }
+      break
+
+    case "/api/slideimg":
+      try {
+        const formData = await req.formData()
+        const uuid = formData.get("uuid")
+        const img = formData.get("image")
+        const imgPath = `images/${uuid}_slideimg.png`
+        await Bun.write(imgPath, img)
+        //db.query(`UPDATE stats SET slideimg=?1 WHERE uuid=?2`)
+        //  .run(imgPath, uuid)
+        return new Response("OK")
+      } catch(err) {
+        console.log(err)
+      }
+      break
+
+    case "/api/predictimg":
+      try {
+        const formData = await req.formData()
+        const uuid = formData.get("uuid")
+        const img = formData.get("image")
+        const imgPath = `images/${uuid}_predict.png`
+        await Bun.write(imgPath, img)
+        //db.query(`UPDATE stats SET predimg=?1 WHERE uuid=?2`)
+        //  .run(imgPath, uuid)
+        return new Response("{}")
+      } catch(err) {
+        console.log(err)
+      }
+      break
+
+    case "/api/verdict":
+      try {
+        const json = await req.json()
+        const { predictSeq, predictLetter, verdictLetter, uuid } = json
+        const res = db.query(`UPDATE stats SET predictSeq=?1, predictLetter=?2, verdictLetter=?3 WHERE uuid=?4`)
+          .all(predictSeq, predictLetter, verdictLetter, uuid)
+        return new Response("{}")
+      } catch(err) {
+        console.log(err)
+      }
+      break
+
+    default:
       const filePath = BASE_PATH + url.pathname
       const file = Bun.file(filePath)
       return new Response(file)
@@ -28,46 +88,7 @@ const httpServer = Bun.serve({
   },
   websocket: {
     message(ws, data) {
-      if (!pendingBuffer) {
-        console.log(`Got new data from ${ws.data.sessionId}: ${data.length}`)
-        const buf = Buffer.from(data.buffer);
-        pendingCmd = buf.readUInt8(0)
-        pendingMode = buf.readUInt8(1)
-        pendingSize = buf.readInt32(2)
-        pendingBuffer = buf.slice(6)
-        console.log(`buffer Cmd: ${pendingCmd} Mode: ${pendingCmd} Size: ${pendingSize}`)
-        if (pendingBuffer.length < pendingSize) {
-          return
-        }
-      } else {
-        console.log(`Adding raw data to pending buffer from ${ws.data.sessionId}: ${data.length}`)
-        pendingBuffer = Buffer.concat([pendingBuffer, data])
-        console.log(`pending buffer now: ${pendingBuffer.length} expecting: ${pendingSize}`)
-        if (pendingBuffer.length < pendingSize ) {
-          return
-        }
-      }
-      console.log(pendingBuffer.length, pendingSize)
-      switch(pendingCmd) {
-      case 0:
-        console.log(`WS command response: ${pendingBuffer}`)
-        break
-      case 1:
-        console.log(`GAME MODE CHANGE: ${pendingMode}`)
-        ws.publish("commands", data) // we just forward command messages
-        break
-      case 2:
-        console.log("CENTROID DATA")
-        ws.publish("centroids", pendingBuffer)
-        break
-      case 3:
-        //console.log("IMAGE DATA")
-        ws.publish("images", pendingBuffer)
-        break
-      default:
-        console.log("UNKNOWN CMD")
-      }
-      pendingBuffer = undefined
+      ws.publish("shell-game", data)
     },
     open(ws) {
       console.log(`opened websocket type ${ws.binaryType} for channels ${ws.data.channels}`)
