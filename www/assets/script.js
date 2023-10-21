@@ -1,11 +1,17 @@
-/* shell game javascript */
+///////////////////////
+// SHELL GAME JAVASCRIPT
+// Game Globals
+///////////////////////
 
 const GameModes = ["IDLE","START","STOP","SNAP","TRACK_BALL","TRACK_HIDDEN","TRACK_IDLE","PREDICT","VERDICT"]
-const eyesActive = false
+var eyesActive = false
 var gameMode = GameModes[0]
 var imgPos = [-150, 0] // don't know why we need to start negative offset, but hey, javascript
 var centroid = {x: 320, y: 240}
-var predictLetter, verdictLetter
+var machineScore = 0
+var humanScore = 0
+var predictLetter = ""
+var verdictLetter = ""
 var predictSeq = ""
 var timerId
 var duration
@@ -16,17 +22,146 @@ const dvCmd = new DataView(cmdBuf)
 dvCmd.setUint8(0, 1) // command
 dvCmd.setInt32(2, 0, true) // command length 0, little endian
 
-function centroidToLetter(centroid) {
-  if (centroid.x < 220) {
-    return "A"
-  } else if (centroid.x > 421) {
-    return "C"
+///////////////////////////////////
+// INPUT FROM SHELL GAME BUTTON BOX
+///////////////////////////////////
+
+var buttonBoxWriter
+const startBtn = 115
+const gameABtn = 97
+const gameBBtn = 98
+const gameCBtn = 99
+
+document.getElementById("connectBtn").addEventListener("click", async(evt) => {
+  // connect to shell game box
+  if ("serial" in navigator) {
+    try {
+      //const port = await navigator.serial.requestPort()
+      const filters = [{ usbVendorId: 0x16c0, usbProductId: 0x0487 }]
+      const port = await navigator.serial.requestPort({ filters })
+      await port.open({ baudRate: 9600 })
+      console.log(port)
+      buttonBoxWriter = port.writable.getWriter()
+      resetGame()
+    } catch(err) {
+      console.log(err)
+    }
   } else {
-    return "B"
+    console.log("you need to activate web serial in browser!")
+  }
+  // connect to eyes
+  if ("bluetooth" in navigator) {
+    try {
+      //Device A4:06:E9:8E:00:0A HMSoft
+      // HMSoft uU8ptu87vOOkd/NIwmqtDg== false
+      //console.log("here")
+      await connectToEyes()
+    } catch(err) {
+      console.log(err)
+    }
+  } else {
+    console.log("you need to activate web bluetooth api in browser!")
+  }
+})
+
+document.addEventListener("keypress", (event) => {
+  event.preventDefault()
+  console.log(event.key)
+  console.log(event.code)
+  switch (event.key) {
+    case "s":
+      if (gameMode === GameModes[0] || gameMode === GameModes[4] || gameMode === GameModes[5] || gameMode === GameModes[6]) {
+        document.getElementById("startBtn").click()
+        buttonLedOff(startBtn) // s
+      } else if (gameMode === GameModes[2]) { // GameMode.STOP
+        if (predictLetter === "") {
+          document.getElementById("predictBtn").click()
+        } else if (verdictLetter === "") {
+          document.getElementById("verdictBtn").click()
+        } else {
+          resetGame()
+        }
+        buttonLedToggle(startBtn) // s
+      } else if (gameMode === GameModes[7]) { // GameMode.PREDICT
+        document.getElementById("verdictBtn").click()
+        buttonLedToggle(startBtn) // s
+      }
+      break
+    case "a","b","c":
+      if (gameMode === GameModes[8]) { // GameMode.VERDICT - override verdict
+        verdictLetter = centroidToLetter(centroid)
+        document.getElementById("verdictBtn").click()
+        buttonLedToggle(event.key.charCodeAt(0))
+        setTimeout(() => {
+          resetGame()
+        }, 5000)
+      }
+      break
+    default:
+      console.log("NOOP")
+  }
+})
+
+// toggle key led
+async function buttonLedToggle(key) {
+  console.log("LED TOGGLE", key)
+  if (buttonBoxWriter) {
+    const data = new Uint8Array([key])
+    await buttonBoxWriter.write(data)
+    //buttonBoxWriter.releaseLock()
   }
 }
 
+// (key - 10) => led off
+async function buttonLedOff(key) {
+  console.log("LED OFF", key)
+  if (buttonBoxWriter) {
+    const data = new Uint8Array([key - 10])
+    await buttonBoxWriter.write(data)
+    //buttonBoxWriter.releaseLock()
+  }
+}
+
+// (key + 10) => led on
+async function buttonLedOn(key) {
+  console.log("LED ON", key)
+  if (buttonBoxWriter) {
+    const data = new Uint8Array([key + 10])
+    await buttonBoxWriter.write(data)
+    //buttonBoxWriter.releaseLock()
+  }
+}
+
+function resetButtonBox() {
+  console.log("RESET BUTTON BOX")
+  if (buttonBoxWriter) {
+    for (const b of [gameABtn, gameBBtn, gameCBtn]) {
+      buttonLedOff(b)
+    }
+    buttonLedOn(startBtn)
+  }
+}
+
+function resetGame() {
+  resetButtonBox()
+  dvCmd.setUint8(1, 0) // GameMode.IDLE
+  ws.send(new Uint8Array(cmdBuf))
+}
+
+////////////////////////
 // INPUT FROM WEBSOCKETS
+////////////////////////
+
+function centroidToLetter(centroid) {
+  if (centroid.x < 220) {
+    return "a"
+  } else if (centroid.x > 421) {
+    return "c"
+  } else {
+    return "b"
+  }
+}
+
 const ws = new WebSocket("ws://localhost:8665/ws?channels=shell-game")
 ws.addEventListener("open", event => ws.binaryType = "arraybuffer")
 ws.addEventListener("message", async event => {
@@ -67,8 +202,7 @@ ws.addEventListener("message", async event => {
   case 3:
     console.log("snap")
     // update gameSeq
-    predictLetter = centroidToLetter(centroid)
-    predictSeq += predictLetter
+    predictSeq += centroidToLetter(centroid)
     var blob = new Blob([data], {type: "image/png"})
     var img = new Image()
     img.onload = function (e) {
@@ -92,6 +226,11 @@ ws.addEventListener("message", async event => {
         imgPos[1] = 0
       }
     }
+    let formData = new FormData()
+    formData.append("uuid", uuid)
+    formData.append("num", slideCnt)
+    formData.append("image", blob, "snap.png")
+    fetch("/api/snapimg", { method: "POST", body: formData })
     break
   case 4:
     console.log("dunno")
@@ -114,6 +253,9 @@ ws.addEventListener("message", async event => {
       return
     }
     img.src = window.URL.createObjectURL(blob)
+    if (buttonBoxWriter) {
+      buttonLedOn(115)
+    }
     break
   case 8:
     console.log("verdict")
@@ -132,12 +274,14 @@ ws.addEventListener("message", async event => {
       return
     }
     img.src = window.URL.createObjectURL(blob)
+    buttonLedOn(verdictLetter.charCodeAt(0))
+    showResults()
     break
   case 9:
     console.log("stats")
     const slideCanvas = document.getElementById("slideBox")
     const predictCanvas = document.getElementById("predictBox")
-
+    addScore()
     const rect = {
       x: dv.getInt32(6, true),
       y: dv.getInt32(10, true),
@@ -190,23 +334,79 @@ function clearData() {
   ctxTrace.clearRect(0, 0, predictCanvas.width, predictCanvas.height)
   imgPos = [-150, 0] // don't know why we need to start negative offset, but hey, javascript
   centroid = {x: 320, y: 240}
-  predictLetter = centroidToLetter(centroid)
-  verdictLetter = centroidToLetter(centroid)
+  predictLetter = ""
+  verdictLetter = ""
   predictSeq = ""
   uuid = genUUID()
   dvCmd.setUint8(1, 4) // GameMode.TRACK_BALL
   ws.send(new Uint8Array(cmdBuf))
 }
 
+function showResults() {
+  if (predictLetter === verdictLetter) {
+    // SUCCESS
+    document.getElementById("overlayImg").src = "/assets/robot-success.png"
+    popUpOverlay("hurra!")
+  } else {
+    // FAILURE
+    document.getElementById("overlayImg").src = "/assets/robot-failure.jpg"
+    popUpOverlay("fillern!")
+  }
+}
+
+function showOverlay(text) {
+  const overlay = document.getElementById("fullscreenOverlay")
+  const img = document.getElementById("overlayImg")
+  document.getElementById("overlayText").innerHTML = text
+  if (img.src == "") {
+    img.classList.add("hidden")
+  } else {
+    img.classList.remove("hidden")
+  }
+  overlay.classList.remove("hidden")
+  overlay.style.opacity = 1
+}
+
+function hideOverlay() {
+  const overlay = document.getElementById("fullscreenOverlay")
+  overlay.classList.add("hidden")
+  overlay.style.opacity = 0
+  document.getElementById("overlayImg").src = ""
+  document.getElementById("overlayText").innerHTML =""
+}
+
+function popUpOverlay(text) {
+    showOverlay(text)
+    setTimeout(() => {
+      hideOverlay()
+    }, 3000)
+}
+
+/////////////////////////
+// BUTTON EVENT LISTENERS
+/////////////////////////
+
 // simple countdown timer
-function startTimer() {
+document.getElementById("startBtn").addEventListener("click", function(evt) {
+  document.getElementById("startBtn").classList.remove("open")
+  document.getElementById("overlayImg").src = "/assets/cups.png"
+  showOverlay("snurr i vei!")
   clearData()
   duration = 18 // one game = 18 secs
   slideCnt = 0
   timerId = setInterval(function (evt) {
     if(duration <= 0) {
+      // FINISHED
       clearInterval(timerId)
       document.querySelector(".countdownTimer").innerHTML = "FERDIG!"
+      setTimeout(() => {
+        document.querySelector(".countdownTimer").innerHTML = ""
+      }, 1000)
+      dvCmd.setUint8(1, 2) // GameMode.STOP
+      ws.send(new Uint8Array(cmdBuf))
+      buttonLedOn(startBtn)
+      document.getElementById("predictBtn").classList.add("open")
+      hideOverlay()
     } else {
       document.querySelector(".countdownTimer").innerHTML = "00:" + duration.toString().padStart(2, "0")
       dvCmd.setUint8(1, 3) // GameMode.SNAP
@@ -215,42 +415,46 @@ function startTimer() {
     duration -= 1
     slideCnt += 1
   }, 1000)
-}
+})
 
-// button actions
-document.getElementById("startBtn").addEventListener("click", startTimer)
+//document.getElementById("eyesBtn").addEventListener("click", function(evt) {
+//  console.log("EYES")
+//  popUpOverlay("my eyes see you!")
+//})
 document.getElementById("predictBtn").addEventListener("click", function(evt) {
   console.log("PREDICT")
   dvCmd.setUint8(1, 7) // GameMode.PREDICT
   ws.send(new Uint8Array(cmdBuf))
+  document.getElementById("predictBtn").classList.remove("open")
+  document.getElementById("verdictBtn").classList.add("open")
 })
 
 document.getElementById("verdictBtn").addEventListener("click", function(evt) {
   console.log("VERDICT")
   dvCmd.setUint8(1, 8) // GameMode.VERDICT
   ws.send(new Uint8Array(cmdBuf))
+  document.getElementById("verdictBtn").classList.remove("open")
+  document.getElementById("startBtn").classList.add("open")
 })
+
+////////////////////
 // WEB Bluetooth API
+// emulates a serial port
+////////////////////
+
 /*
-Instead, they provide only one characteristic that emulates a serial port, and everything you write down there, module will send to your controller via TX,
-and everything you send from the controller to the module RX, it will send to the connected device. BTW, with a limit of 20 bytes, inherent in any BLE characteristic, by the way.
-*/
-/*const sendCentBtn = document.getElementById("sendCentBtn")
+const sendCentBtn = document.getElementById("sendCentBtn")
 document.getElementById("sendCentBtn").addEventListener("click", async function(evt) {
   const div = document.querySelector(".centroid")
   const xy = div.innerText.split(",")
   const x = parseInt(xy[0], 10)
   const y = parseInt(xy[1], 10)
   writeToEyes(x, y)
-})*/
-
-let btDevice
-let btCharacteristic // the btle char device to send centroids to
-document.getElementById("eyesBtn").addEventListener("click", async function(evt) {
-  //Device A4:06:E9:8E:00:0A HMSoft
-  // HMSoft uU8ptu87vOOkd/NIwmqtDg== false
-  await connectToEyes()
 })
+*/
+
+var btDevice
+var btCharacteristic // the btle char device to send centroids to
 
 // transpond x, y (640,640) to u8 (255,255)
 async function writeToEyes(x, y) {
@@ -261,6 +465,7 @@ async function writeToEyes(x, y) {
     await btCharacteristic.writeValueWithoutResponse(cmd);
     //console.log(`in: (${x}, ${y}) -- written (${x1}, ${y1})`)
 }
+
 async function connectToEyes() {
   const serviceUUID = 0xffe0;
   const serialUUID = 0xffe1 //       0000ffe1-0000-1000-8000-00805f9b34fb
@@ -286,6 +491,8 @@ async function connectToEyes() {
     console.log(`Characteristics: ${characteristics.map(c => c.uuid).join('\n' + ' '.repeat(19))}`)
     btCharacteristic = await service.getCharacteristic(serialUUID) //19b10001-e8f2-537e-4f6c-d104768a1214
 
+    // now activate eyes
+    eyesActive = true
     // No notifications
     //const notifications = await btCharacteristic.startNotifications()
     //await btCharacteristic.writeValueWithoutResponse(new Uint8Array([ 200, 200  ]))
@@ -295,3 +502,42 @@ async function connectToEyes() {
     console.log("Argh! " + error)
   }
 }
+
+function addScore() {
+  if (predictLetter === verdictLetter) {
+    machineScore += 1
+    document.getElementById("machineScore").innerHTML = machineScore
+  } else {
+    humanScore += 1
+    document.getElementById("humanScore").innerHTML = humanScore
+  }
+}
+
+function calculateScores(data) {
+  for (let [time,uuid,boxx,boxy,boxw,boxh,centx,centy,score,seq,pred,verd] of [...data]) {
+    console.log(pred)
+    if (pred === verd) {
+      machineScore += 1
+    } else {
+      humanScore += 1
+    }
+  }
+  document.getElementById("machineScore").innerHTML = machineScore
+  document.getElementById("humanScore").innerHTML = humanScore
+}
+
+async function fetchStats() {
+  try {
+    const res = await fetch("/api/getstats")
+    const json = await res.json()
+    console.log(json)
+    calculateScores(json)
+  } catch(err) {
+    console.log("error on loading results", err)
+  }
+}
+
+window.addEventListener("load", (event) => {
+    console.log("page loaded - fetch results")
+    fetchStats()
+})

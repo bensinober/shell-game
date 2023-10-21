@@ -44,6 +44,31 @@ const httpServer = Bun.serve({
       }
       break
 
+    case "/api/getstats":
+      try {
+        const stats = db.query(`SELECT * FROM stats`).values()
+        return Response.json(stats)
+      } catch(err) {
+        console.log(err)
+      }
+      break
+
+    case "/api/snapimg":
+      try {
+        const formData = await req.formData()
+        const uuid = formData.get("uuid")
+        const num = formData.get("num").padStart(2, "0")
+        const img = formData.get("image")
+        const imgPath = `images/${uuid}_snap_${num}.png`
+        await Bun.write(imgPath, img)
+        //db.query(`UPDATE stats SET slideimg=?1 WHERE uuid=?2`)
+        //  .run(imgPath, uuid)
+        return new Response("OK")
+      } catch(err) {
+        console.log(err)
+      }
+      break
+
     case "/api/slideimg":
       try {
         const formData = await req.formData()

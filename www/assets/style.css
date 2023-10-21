@@ -20,9 +20,39 @@ body {
   height:50%;  /* gives quarters their size */
 }
 #NW { top:0;    left:0;   padding: 1rem; margin: 1rem;}
-#NE { top:0;    left:50%; background:black; }
+#NE { top:0;    left:50%; }
 #SW { top:50%;  left:0;   padding: 1em; background:transparent; }
 #SE { top:50%;  left:50%; }
+
+/* full screen overlay for messages etc */
+.overlay {
+  display: grid;
+  font-family: 'Blade Runner Movie Font', sans-serif; font-size: 62px; color: red;
+  place-items: center;
+  position : fixed;
+  top : 50%;
+  left : 50%;
+  height : 100%;
+  width : 100%;
+  transform : translate(-50%,-50%);
+  background-color: rgba(0,0,0,0.5);
+  overflow: hidden;
+  opacity: 0;
+  transition: 0.5s; /* 0.5 second transition effect to slide in or slide down the overlay (height or width, depending on reveal) */
+}
+
+.scores {
+  display: grid; grid-template-columns: 50% 50%; font-family: 'Blade Runner Movie Font', sans-serif; font-size: 48px; text-align: left;
+}
+
+.scores .col {
+  padding: 1em;
+}
+
+.hidden{
+  transition : 0.5s;
+  display : none;
+}
 
 .countdownTimer {
   font-family: "Orbitron", sans-serif;
@@ -30,8 +60,14 @@ body {
   font-weight: bold;
   color: red;
 }
+
 #gameMode {
   font-family: 'Blade Runner Movie Font', sans-serif; font-size: 24px;
+}
+
+#connectBtn {
+  margin-top: 250px;
+  margin-left: 800px;
 }
 
 .buttons { display: flex; flex-wrap: wrap; justify-content: space-around; }
@@ -81,6 +117,13 @@ body {
   -moz-box-shadow: rgba(0, 0, 0, 0.8) 0 0 10px 5px, rgba(0, 0, 0, 0.8) 0 3px 3px inset, #8d0230 0 8px 10px inset, rgba(0, 0, 0, 0.3) 0 20px 10px inset, rgba(255, 255, 255, 0.3) 0 -2px 3px inset, #8d0230 0 -7px 20px inset;
   -webkit-box-shadow: rgba(0, 0, 0, 0.8) 0 0 10px 5px, rgba(0, 0, 0, 0.8) 0 3px 3px inset, #8d0230 0 8px 10px inset, rgba(0, 0, 0, 0.3) 0 20px 10px inset, rgba(255, 255, 255, 0.3) 0 -2px 3px inset, #8d0230 0 -7px 20px inset;
   box-shadow: rgba(0, 0, 0, 0.8) 0 0 10px 5px, rgba(0, 0, 0, 0.8) 0 3px 3px inset, #8d0230 0 8px 10px inset, rgba(0, 0, 0, 0.3) 0 20px 10px inset, rgba(255, 255, 255, 0.3) 0 -2px 3px inset, #8d0230 0 -7px 20px inset;
+}
+
+.arcade-button.open {
+  border-color: yellow;
+  background-image: -moz-radial-gradient(40px 40px, circle contain, beige 15px, beige 30px, beige 40px, beige 65px);
+  background-image: -webkit-radial-gradient(40px 40px, circle contain, beige 15px, beige 30px, beige 40px, beige 65px);
+  background-image: radial-gradient(circle contain at 40px 40px, beige 15px, beige 30px, beige 40px, beige 65px);
 }
 
 .arcade-button:before {

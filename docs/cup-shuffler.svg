@@ -24,7 +24,7 @@
      inkscape:document-units="mm"
      showgrid="false"
      inkscape:zoom="0.33589188"
-     inkscape:cx="954.1761"
+     inkscape:cx="952.68751"
      inkscape:cy="949.71037"
      inkscape:window-width="1916"
      inkscape:window-height="1161"
@@ -54,42 +54,42 @@
      inkscape:groupmode="layer"
      id="layer1">
     <rect
-       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.258865"
+       style="fill:none;fill-rule:evenodd;stroke-width:0.259;stroke:#000000;stroke-opacity:1;stroke-miterlimit:4;stroke-dasharray:none"
        id="rect388"
        width="250"
        height="130"
        x="6.0208654"
        y="5.5383916" />
     <rect
-       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.335219"
+       style="fill:none;fill-rule:evenodd;stroke-width:0.335219;stroke:#000000;stroke-opacity:1"
        id="rect388-2"
        width="250"
        height="218"
        x="6.4573479"
        y="142.03639" />
     <rect
-       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.335219"
+       style="fill:none;fill-rule:evenodd;stroke-width:0.335219;stroke:#000000;stroke-opacity:1"
        id="rect388-2-0"
        width="250"
        height="218"
        x="6.1711197"
        y="367.62656" />
     <rect
-       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.276472"
+       style="fill:none;fill-rule:evenodd;stroke-width:0.276472;stroke:#000000;stroke-opacity:1"
        id="rect671"
        width="130"
        height="218"
        x="263.74304"
        y="366.91885" />
     <rect
-       style="fill:#0000ff;fill-rule:evenodd;stroke-width:0.276472"
+       style="fill:none;fill-rule:evenodd;stroke-width:0.276472;stroke:#000000;stroke-opacity:1"
        id="rect671-8"
        width="130"
        height="218"
        x="263.60962"
        y="5.892663" />
     <rect
-       style="fill:#ff0000;fill-rule:evenodd;stroke-width:0.165492"
+       style="fill:none;fill-rule:evenodd;stroke-width:0.165492;stroke:#000000;stroke-opacity:1"
        id="rect1099"
        width="70"
        height="95"
@@ -103,23 +103,81 @@
        id="text2666"><tspan
          sodipodi:role="line"
          id="tspan2664"
-         style="stroke-width:0.264583;-inkscape-font-specification:'Blade Runner Movie Font';font-family:'Blade Runner Movie Font';font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal"></tspan></text>
-    <text
-       xml:space="preserve"
-       style="font-style:normal;font-weight:normal;font-size:19.7556px;line-height:1.25;font-family:sans-serif;fill:#ffff00;fill-opacity:1;stroke:none;stroke-width:0.264583"
-       x="242.72942"
-       y="393.93143"
-       id="text5068"><tspan
-         sodipodi:role="line"
-         id="tspan5066"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end;fill:#ffff00;stroke-width:0.264583"
-         x="242.72942"
-         y="393.93143">shell game</tspan><tspan
-         sodipodi:role="line"
-         style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end;fill:#ffff00;stroke-width:0.264583"
-         x="242.72942"
-         y="419.21652"
-         id="tspan16456">shuffler</tspan></text>
+         style="stroke-width:0.264583;-inkscape-font-specification:'Blade Runner Movie Font';font-family:'Blade Runner Movie Font';font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal" /></text>
+    <g
+       aria-label="shell game
+shuffler"
+       id="text5068"
+       style="font-size:19.7556px;line-height:1.25;fill:#ff0000;stroke-width:0.264583">
+      <path
+         d="m 114.89106,380.30006 -0.889,3.27943 h -12.80163 q 0.41487,-1.26436 1.52118,-2.23238 1.20509,-1.04705 2.4497,-1.04705 z m -3.33869,12.36701 q -0.79023,0.80998 -2.4497,1.26436 l -10.786556,-0.0198 1.047047,-3.75356 7.467619,0.0395 q 0.96802,-0.11853 0.96802,-0.94827 0,-0.49389 -0.13829,-0.67169 -0.11853,-0.1778 -0.59267,-0.33585 h -3.81283 q -1.2446,0 -1.81751,-0.61242 -0.57291,-0.63218 -0.57291,-2.03483 0,-0.69144 0,-0.69144 h 8.73197 q 1.60021,0.19755 2.15336,0.63218 0.079,0.0593 1.0668,1.16558 0.37536,0.94827 0.37536,2.15336 0,2.19287 -1.63971,3.81283 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36807" />
+      <path
+         d="m 129.74727,380.30006 -0.86925,3.31894 h -4.82037 l 0.92852,-3.31894 z m -8.31711,0 -0.889,3.31894 h -4.74135 l 0.86925,-3.31894 z m 7.05275,4.60306 -2.4497,9.02831 h -4.78085 l 1.4224,-5.45255 h -3.45723 l -1.52118,5.43279 h -4.84012 l 2.4892,-9.00855 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36809" />
+      <path
+         d="m 143.93175,380.30006 -0.86924,3.31894 h -12.88065 l 2.1336,-3.31894 z m -1.28411,4.60306 -0.94827,3.59552 h -6.42057 l -0.51365,1.85702 h 6.36131 l -0.94827,3.55601 h -11.59654 l 2.41019,-9.00855 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36811" />
+      <path
+         d="m 151.35986,380.30006 -0.98778,3.29919 h -4.78086 l 0.90876,-3.25968 z m 3.71405,10.25316 -2.76579,3.35845 h -9.60122 l 2.54848,-9.00855 h 4.80061 l -1.58045,5.63034 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36813" />
+      <path
+         d="m 163.23297,380.30006 -0.98778,3.29919 h -4.78086 l 0.90876,-3.25968 z m 3.71405,10.25316 -2.76578,3.35845 h -9.60123 l 2.54848,-9.00855 h 4.80061 l -1.58045,5.63034 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36815" />
+      <path
+         d="m 196.08649,380.30006 -0.80998,3.29919 h -12.9004 q 0.3556,-1.14583 1.38289,-2.17312 1.12607,-1.12607 2.35092,-1.12607 z m -1.16558,5.09695 -1.04704,3.8721 q -0.43463,1.58044 -1.32363,2.62749 -1.71874,2.01507 -4.99817,2.01507 h -2.37067 q -3.43747,0 -4.20794,-1.9558 -0.31609,-0.79023 -0.31609,-1.44216 0,-0.5334 0.19756,-1.26436 l 1.22484,-4.34623 h 4.66232 l -1.16558,4.06965 q -0.0988,0.33585 -0.0988,0.49389 0,0.39511 0.39511,0.51365 h 2.80529 q 0.59267,-0.15805 0.79023,-1.00754 l 0.0395,-0.23707 -2.92383,0.0395 2.09409,-3.37821 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36817" />
+      <path
+         d="m 208.86835,383.619 h -8.53442 l 2.84481,-3.31894 h 4.97841 z m 2.21263,10.29267 h -4.95865 l -1.34339,-5.37352 h -2.80529 l -3.97088,5.37352 h -5.78839 l 7.07251,-9.02831 h 9.85804 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36819" />
+      <path
+         d="m 229.86855,380.30006 -0.92851,3.31894 H 213.2936 l 0.92852,-3.31894 h 4.62281 l 2.74602,2.6275 3.35846,-2.6275 z m -1.2446,4.60306 -2.54847,9.00855 h -4.91915 l 2.25214,-8.09979 -3.3387,2.70651 -2.76578,-2.70651 -2.29165,8.09979 h -4.56354 l 2.50896,-9.00855 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36821" />
+      <path
+         d="m 243.83574,380.30006 -0.86925,3.31894 h -12.88065 l 2.1336,-3.31894 z m -1.28412,4.60306 -0.94827,3.59552 h -6.42057 l -0.51364,1.85702 h 6.3613 l -0.94827,3.55601 h -11.59653 l 2.41018,-9.00855 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36823" />
+      <path
+         d="m 145.17642,405.58517 -0.88901,3.27943 h -12.80163 q 0.41487,-1.26436 1.52119,-2.23238 1.20509,-1.04705 2.44969,-1.04705 z m -3.3387,12.36701 q -0.79022,0.80998 -2.4497,1.26435 l -10.78655,-0.0197 1.04704,-3.75357 7.46762,0.0395 q 0.96803,-0.11854 0.96803,-0.94827 0,-0.49389 -0.13829,-0.67169 -0.11854,-0.1778 -0.59267,-0.33585 h -3.81283 q -1.24461,0 -1.81752,-0.61242 -0.57291,-0.63218 -0.57291,-2.03483 0,-0.69144 0,-0.69144 h 8.73197 q 1.60021,0.19755 2.15337,0.63217 0.079,0.0593 1.0668,1.16558 0.37535,0.94827 0.37535,2.15337 0,2.19287 -1.63971,3.81283 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36825" />
+      <path
+         d="m 160.03262,405.58517 -0.86925,3.31894 h -4.82036 l 0.92851,-3.31894 z m -8.31711,0 -0.889,3.31894 h -4.74134 l 0.86924,-3.31894 z m 7.05275,4.60306 -2.44969,9.0283 h -4.78086 l 1.4224,-5.45254 h -3.45723 l -1.52118,5.43279 h -4.84012 l 2.48921,-9.00855 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36827" />
+      <path
+         d="m 174.86904,405.64444 -0.92851,3.25967 h -4.50428 l 0.90876,-3.25967 z m -8.21833,0 -0.90876,3.25967 h -4.44501 l 0.92852,-3.23992 z m 6.97373,4.54379 -2.48921,9.00855 -7.23055,0.0197 q -3.39796,0 -4.20794,-2.03482 -0.21731,-0.55316 -0.21731,-1.10632 0,-0.31609 0.079,-0.59266 l 1.46192,-5.2945 h 4.38574 l -1.40265,4.89938 q -0.0988,0.33585 -0.0988,0.49389 0,0.39512 0.39512,0.51365 h 3.16089 l 1.65947,-5.90692 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36829" />
+      <path
+         d="m 188.63867,405.58517 -0.94827,3.31894 h -12.82138 l 2.11385,-3.31894 z m -1.22485,4.60306 -1.08656,3.61527 h -6.34154 l -1.48167,5.39328 h -5.19573 l 2.50897,-9.00855 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36831" />
+      <path
+         d="m 202.07245,405.58517 -0.94827,3.31894 h -12.82139 l 2.11385,-3.31894 z m -1.22485,4.60306 -1.08656,3.61527 h -6.34155 l -1.48167,5.39328 h -5.19572 l 2.50896,-9.00855 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36833" />
+      <path
+         d="m 208.96712,405.58517 -0.98778,3.29919 h -4.78086 l 0.90876,-3.25968 z m 3.71405,10.25316 -2.76578,3.35845 h -9.60122 l 2.54847,-9.00855 h 4.80061 l -1.58045,5.63034 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36835" />
+      <path
+         d="m 227.6164,405.58517 -0.86925,3.31894 H 213.8665 l 2.13361,-3.31894 z m -1.28412,4.60306 -0.94826,3.59551 h -6.42057 l -0.51365,1.85703 h 6.3613 l -0.94827,3.55601 H 212.2663 l 2.41018,-9.00855 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36837" />
+      <path
+         d="m 243.61844,408.8646 h -15.31059 l 2.09409,-3.27943 h 11.24094 q 0.45437,0 0.90875,0.31609 0.47414,0.31609 0.7112,0.75071 0.35561,0.65194 0.35561,2.21263 z m -0.23707,1.32363 q -0.15805,1.20509 -1.38289,2.27189 -0.55316,0.49389 -0.92852,0.61242 0.45438,0.7112 0.45438,1.50143 0,0.45438 -0.13829,1.28411 -0.079,0.51365 -1.02729,3.3387 h -4.42525 l 1.58044,-5.43279 h -4.66232 l -1.67922,5.43279 h -4.60306 l 2.64725,-9.00855 z"
+         style="font-family:'Blade Runner Movie Font';-inkscape-font-specification:'Blade Runner Movie Font';text-align:end;text-anchor:end"
+         id="path36839" />
+    </g>
     <text
        xml:space="preserve"
        transform="scale(0.26458333)"

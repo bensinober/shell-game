@@ -585,7 +585,7 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
 
     // Now see if we have pending modes
     switch (gameMode) {
-        .IDLE, .TRACK_BALL, .TRACK_HIDDEN, .TRACK_IDLE => {
+        .IDLE, .TRACK_BALL, .TRACK_HIDDEN, .TRACK_IDLE, .STOP=> {
             if (focusObj) |obj| {
                 try tracker.sendCentroid(obj.centre);
             }
@@ -626,7 +626,7 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
                 try tracker.sendStats(obj);
             }
             tracker.clearOverlay();
-            gameMode = GameMode.IDLE;
+            gameMode = GameMode.STOP;
         },
         else => {
             if (focusObj) |obj| {
@@ -799,7 +799,7 @@ pub fn main() anyerror!void {
         // time frames per sec
 
         window.imShow(squaredImg);
-        if (window.waitKey(1) >= 0) {
+        if (window.waitKey(1) == 27) {
             break;
         }
     }
