@@ -40,7 +40,6 @@ document.getElementById("connectBtn").addEventListener("click", async(evt) => {
       const filters = [{ usbVendorId: 0x16c0, usbProductId: 0x0487 }]
       const port = await navigator.serial.requestPort({ filters })
       await port.open({ baudRate: 9600 })
-      console.log(port)
       buttonBoxWriter = port.writable.getWriter()
       resetGame()
     } catch(err) {
@@ -66,8 +65,6 @@ document.getElementById("connectBtn").addEventListener("click", async(evt) => {
 
 document.addEventListener("keypress", (event) => {
   event.preventDefault()
-  console.log(event.key)
-  console.log(event.code)
   switch (event.key) {
     case "s":
       if (gameMode === GameModes[0] || gameMode === GameModes[4] || gameMode === GameModes[5] || gameMode === GameModes[6]) {
@@ -91,6 +88,7 @@ document.addEventListener("keypress", (event) => {
       if (gameMode === GameModes[8]) { // GameMode.VERDICT - override verdict
         verdictLetter = centroidToLetter(centroid)
         document.getElementById("verdictBtn").click()
+        resetButtonBox()
         buttonLedToggle(event.key.charCodeAt(0))
         setTimeout(() => {
           resetGame()
@@ -189,7 +187,6 @@ ws.addEventListener("message", async event => {
     break
   case 2:
     // centroid
-    console.log("centroid")
     const x = dv.getInt32(6, true)
     const y = dv.getInt32(10, true)
     centroid = {x, y}
@@ -200,13 +197,11 @@ ws.addEventListener("message", async event => {
     }
     break
   case 3:
-    console.log("snap")
     // update gameSeq
     predictSeq += centroidToLetter(centroid)
     var blob = new Blob([data], {type: "image/png"})
     var img = new Image()
     img.onload = function (e) {
-      console.log("PNG Loaded")
       ctxSlides.drawImage(img, imgPos[0], imgPos[1], 150, 150)
       window.URL.revokeObjectURL(img.src)
       img = null
@@ -236,13 +231,11 @@ ws.addEventListener("message", async event => {
     console.log("dunno")
     break
   case 7:
-    console.log("predict")
     // TODO: send to web service here for prediction?
     predictLetter = centroidToLetter(centroid)
     var blob = new Blob([data], {type: "image/png"})
     var img = new Image()
     img.onload = function (e) {
-      console.log("PNG Loaded")
       ctxTrace.drawImage(img, 0, 0, 450, 450)
       window.URL.revokeObjectURL(img.src)
       img = null
@@ -258,12 +251,10 @@ ws.addEventListener("message", async event => {
     }
     break
   case 8:
-    console.log("verdict")
     verdictLetter = centroidToLetter(centroid)
     var blob = new Blob([data], {type: "image/png"})
     var img = new Image()
     img.onload = function (e) {
-      console.log("PNG Loaded")
       ctxTrace.drawImage(img, 450, 0, 450, 450)
       window.URL.revokeObjectURL(img.src)
       img = null
@@ -278,7 +269,6 @@ ws.addEventListener("message", async event => {
     showResults()
     break
   case 9:
-    console.log("stats")
     const slideCanvas = document.getElementById("slideBox")
     const predictCanvas = document.getElementById("predictBox")
     addScore()
@@ -358,7 +348,7 @@ function showOverlay(text) {
   const overlay = document.getElementById("fullscreenOverlay")
   const img = document.getElementById("overlayImg")
   document.getElementById("overlayText").innerHTML = text
-  if (img.src == "") {
+  if (img.src === "") {
     img.classList.add("hidden")
   } else {
     img.classList.remove("hidden")
@@ -389,7 +379,6 @@ function popUpOverlay(text) {
 // simple countdown timer
 document.getElementById("startBtn").addEventListener("click", function(evt) {
   document.getElementById("startBtn").classList.remove("open")
-  document.getElementById("overlayImg").src = "/assets/cups.png"
   showOverlay("snurr i vei!")
   clearData()
   duration = 18 // one game = 18 secs
@@ -411,6 +400,10 @@ document.getElementById("startBtn").addEventListener("click", function(evt) {
       document.querySelector(".countdownTimer").innerHTML = "00:" + duration.toString().padStart(2, "0")
       dvCmd.setUint8(1, 3) // GameMode.SNAP
       ws.send(new Uint8Array(cmdBuf))
+      if (duration < 4) {
+        let mySound = new Audio("assets/beep-09.wav")
+        mySound.play()
+      }
     }
     duration -= 1
     slideCnt += 1
@@ -480,7 +473,7 @@ async function connectToEyes() {
       //filters: [{ name: "HMSoft" }],
 
     })
-    console.log(btDevice, btDevice.name, btDevice.id, btDevice.gatt.connected)
+    //console.log(btDevice, btDevice.name, btDevice.id, btDevice.gatt.connected)
 
     // BTLE
     const server = await btDevice.gatt.connect()
@@ -488,7 +481,7 @@ async function connectToEyes() {
     //const characteristicUuid = 0xffe1                      // fake characteristics/type for notify and read
 
     let characteristics = await service.getCharacteristics()
-    console.log(`Characteristics: ${characteristics.map(c => c.uuid).join('\n' + ' '.repeat(19))}`)
+    //console.log(`Characteristics: ${characteristics.map(c => c.uuid).join('\n' + ' '.repeat(19))}`)
     btCharacteristic = await service.getCharacteristic(serialUUID) //19b10001-e8f2-537e-4f6c-d104768a1214
 
     // now activate eyes
@@ -499,7 +492,7 @@ async function connectToEyes() {
     //console.log("written!")
 
   } catch(error)  {
-    console.log("Argh! " + error)
+    console.log("bluetooth connect failure: " + error)
   }
 }
 
@@ -515,7 +508,6 @@ function addScore() {
 
 function calculateScores(data) {
   for (let [time,uuid,boxx,boxy,boxw,boxh,centx,centy,score,seq,pred,verd] of [...data]) {
-    console.log(pred)
     if (pred === verd) {
       machineScore += 1
     } else {
@@ -530,7 +522,6 @@ async function fetchStats() {
   try {
     const res = await fetch("/api/getstats")
     const json = await res.json()
-    console.log(json)
     calculateScores(json)
   } catch(err) {
     console.log("error on loading results", err)
