@@ -46,7 +46,7 @@ const httpServer = Bun.serve({
 
     case "/api/getstats":
       try {
-        const stats = db.query(`SELECT * FROM stats`).values()
+        const stats = db.query(`SELECT STRFTIME('%s', time),uuid,boxx,boxy,boxw,boxh,centx,centy,score,predictSeq,predictLetter,verdictLetter FROM stats`).values()
         return Response.json(stats)
       } catch(err) {
         console.log(err)
@@ -106,6 +106,17 @@ const httpServer = Bun.serve({
         const res = db.query(`UPDATE stats SET predictSeq=?1, predictLetter=?2, verdictLetter=?3 WHERE uuid=?4`)
           .all(predictSeq, predictLetter, verdictLetter, uuid)
         return new Response("{}")
+      } catch(err) {
+        console.log(err)
+      }
+      break
+
+    case "/api/savemodel":
+      try {
+        const json = await req.json()
+        const modelPath = "www/assets/model.json"
+        await Bun.write(modelPath, JSON.stringify(json))
+        return new Response("OK")
       } catch(err) {
         console.log(err)
       }
