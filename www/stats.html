@@ -1,0 +1,152 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="refresh" content="60;">
+
+    <title>stats</title>
+    <link href="https://fonts.cdnfonts.com/css/blade-runner-movie-font" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css?family=Orbitron" rel="stylesheet">
+    <link href="assets/style.css" rel="stylesheet">
+    <link href="assets/uPlot.min.css" rel="stylesheet" >
+    <script src="assets/uPlot.iife.min.js"></script>
+    <!--<link rel="shortcut icon" href="teachable-machine.jpg" type="image/x-icon" />-->
+    <style>
+      body {
+        margin: 0;
+      }
+
+      .uplot {
+        background: #141619;
+        color: #c7d0d9;
+        margin-top: 30px;
+      }
+    </style>
+</head>
+
+<body>
+  <div id="title">- stats -</div>
+  <script type="module">
+    async function fetchStats() {
+      try {
+        const res = await fetch("/api/getstats")
+        const json = await res.json()
+        var times = []
+        var machine = 0
+        var man = 0
+        var machineWins = []
+        var manWins = []
+        for (let [time,uuid,boxx,boxy,boxw,boxh,centx,centy,score,seq,pred,verd] of [...json]) {
+          times.push(time)
+          if (pred === verd) {
+            machine += 1
+          } else {
+            man += 1
+          }
+            machineWins.push(machine)
+            manWins.push(man)
+        }
+        var data = [times.slice(50), machineWins.slice(50), manWins.slice(50)]
+
+        let opts = {
+          title: "Undroid shell game",
+          id: "chart1",
+          class: "my-chart",
+          width: 950,
+          height: 600,
+          hooks: {
+            drawSeries: [
+              (u, si) => {
+                let ctx = u.ctx;
+
+                ctx.save();
+
+                let s  = u.series[si];
+                let xd = u.data[0];
+                let yd = u.data[si];
+
+                let [i0, i1] = s.idxs;
+
+                let x0 = u.valToPos(xd[i0], 'x', true);
+                let y0 = u.valToPos(yd[i0], 'y', true);
+                let x1 = u.valToPos(xd[i1], 'x', true);
+                let y1 = u.valToPos(yd[i1], 'y', true);
+
+                const offset = (s.width % 2) / 2;
+
+                ctx.translate(offset, offset);
+
+                ctx.beginPath();
+                ctx.strokeStyle = s._stroke;
+                ctx.setLineDash([5, 5]);
+                ctx.moveTo(x0, y0);
+                ctx.lineTo(x1, y1);
+                ctx.stroke();
+
+                ctx.translate(-offset, -offset);
+
+                ctx.restore();
+              }
+            ]
+          },
+          axes: [
+            {
+              stroke: "#c7d0d9",
+              font: `12px 'Roboto'`,
+              labelFont: `12px 'Roboto'`,
+              grid: {
+                width: 1 / devicePixelRatio,
+                stroke: "#2c3235",
+              },
+              ticks: {
+                width: 1 / devicePixelRatio,
+                stroke: "#2c3235",
+              }
+            },
+            {
+              stroke: "#c7d0d9",
+              font: `12px 'Roboto'`,
+              labelFont: `12px 'Roboto'`,
+              grid: {
+                width: 1 / devicePixelRatio,
+                stroke: "#2c3235",
+              },
+              ticks: {
+                width: 1 / devicePixelRatio,
+                stroke: "#2c3235",
+              }
+            }
+          ],
+          series: [
+            {},
+            {
+              spanGaps: false,
+              width: 1 / devicePixelRatio,
+              label: "Maskin",
+              stroke: "red",
+              width: 2,
+            },
+            {
+              spanGaps: false,
+              label: "Menneske",
+              stroke: "green",
+              width: 2,
+            }
+          ]
+        }
+        let uplot = new uPlot(opts, data, document.body);
+      } catch(err) {
+        console.log("error on loading results", err)
+      }
+    }
+    window.addEventListener("load", (event) => {
+      fetchStats()
+    })
+
+  </script>
+</body>
+
+</html>
+
