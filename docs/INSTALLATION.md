@@ -49,6 +49,53 @@ Run server
 
     bun run server.js
 
+### OpenCL
+
+For better performance and detection on Intel GPU devices, OpenCL is recommended (Nvidia is better but a hog to install)
+
+for info: https://support.zivid.com/en/latest/getting-started/software-installation/gpu/install-opencl-drivers-ubuntu.html
+
+    mkdir neo && cd neo
+    wget https://developer.download.nvidia.com/compute/cuda/12.2.1/local_installers/cuda-repo-ubuntu2204-12-2-local_12.2.1-535.86.10-1_amd64.deb
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-toolkit-12-config-common_12.2.140-1_all.deb
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-toolkit-12-2_12.2.1-1_amd64.deb
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-cudart-12-2_12.2.140-1_amd64.deb
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-cudart-dev-12-2_12.2.140-1_amd64.deb
+    wget https://developer.download.nvidia.com/compute/cuda/repos/ubuntu2204/x86_64/cuda-nvcc-12-2_12.2.140-1_amd64.deb
+
+    sudo apt install ./*.deb
+    sudo apt install clinfo
+
+    CC="zig cc" CXX="zig c++" cmake \
+        -D CMAKE_BUILD_TYPE=RELEASE \
+        -D WITH_IPP=OFF \
+        -D WITH_OPENGL=OFF \
+        -D WITH_QT=OFF \
+        -D WITH_OPENVINO=OFF \
+        -D WITH_OPENCL=ON \
+        -D CMAKE_INSTALL_PREFIX=/usr/local \
+        -D OPENCV_DNN_OPENCL=ON \
+        -D OPENCV_EXTRA_MODULES_PATH=../../opencv_contrib-4.8.0/modules/ \
+        -D OPENCV_ENABLE_NONFREE=ON \
+        -D OPENCV_GAPI_ONNX_MODEL_PATH=ON \
+        -D WITH_JASPER=OFF \
+        -D WITH_TBB=ON \
+        -D BUILD_DOCS=OFF \
+        -D BUILD_EXAMPLES=OFF \
+        -D BUILD_TESTS=OFF \
+        -D BUILD_PERF_TESTS=OFF \
+        -D BUILD_opencv_java=NO \
+        -D BUILD_opencv_python=NO \
+        -D BUILD_opencv_python2=NO \
+        -D BUILD_opencv_python3=NO \
+        -D OPENCV_GENERATE_PKGCONFIG=ON \
+        -D ENABLE_FAST_MATH=1 \
+        ..
+
+
+to run with opencl + dnn
+
+    OPENCV_DNN_OPENCL_ALLOW_ALL_DEVICES=1 zig run
 
 ### OpenVino Inference backend (not working with zig)
 
@@ -183,9 +230,8 @@ CC="zig cc" CXX="zig c++" cmake \
     -D WITH_CUDNN=ON \
     -D OPENCV_DNN_CUDA=ON \
     -D CUDA_GENERATION=Auto \
-    -D CUDNN_INCLUDE_DIR=/usr/include \
-    -D CUDNN_LIBRARY=/usr/lib64/libcudnn_static_v7.a \
-    -D CUDNN_VERSION=7.6.5 \
+    -D CUDNN_INCLUDE_DIR=/usr/include/x86_64-linux-gnu/ \
+    -D CUDNN_LIBRARY=/usr/lib/x86_64-linux-gnu/ \
     ..
 ```
 
