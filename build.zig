@@ -15,34 +15,19 @@ pub fn build(b: *std.Build) void {
     // set a preferred release mode, allowing the user to decide how to optimize.
     const optimize = b.standardOptimizeOption(.{});
 
-    const exe = b.addExecutable(.{
-        .name = "shell-game",
-        // In this case the main source file is merely a path, however, in more
-        // complicated build scripts, this could be a generated file.
-        .root_source_file = .{ .path = "src/main.zig" },
-        .target = target,
-        .optimize = optimize,
-    });
-
     // Compile static library of opencv
     const cv = b.addStaticLibrary(std.Build.StaticLibraryOptions{
-        .name = "opencv",
+        .name = "zigcv",
         .target = target,
         .optimize = optimize,
     });
-    const c_build_options: []const []const u8 = &.{
-        "-Wall",
-        "-Wextra",
-        "-std=c++11",
-        "-stdlib=libc++",
-    };
     cv.addIncludePath(.{ .path = "include" });
     cv.addIncludePath(.{ .path = "include/contrib" });
     cv.addLibraryPath(.{ .path = "libs" });
     cv.addLibraryPath(.{ .path = "libs/contrib" });
     cv.addIncludePath(.{ .path = "/usr/local/include" });
     cv.addIncludePath(.{ .path = "/usr/local/include/opencv4" });
-    cv.addCSourceFiles(&.{
+    cv.addCSourceFiles(.{ .files = &.{
         "libs/asyncarray.cpp",
         "libs/calib3d.cpp",
         "libs/core.cpp",
@@ -58,32 +43,66 @@ pub fn build(b: *std.Build) void {
         "libs/video.cpp",
         "libs/videoio.cpp",
         "libs/contrib/tracking.cpp",
-    }, c_build_options);
+    }, .flags = &[_][]const u8{
+        "-Wall",
+        "-Wextra",
+        "-std=c++11",
+        "-stdlib=libc++",
+    } });
 
     cv.linkLibC();
     cv.linkLibCpp();
     b.installArtifact(cv);
 
-    exe.addAnonymousModule("zigcv", .{ .source_file = .{ .path = "libs/zigcv.zig" } });
+    const exe = b.addExecutable(.{
+        .name = "shell-game",
+        // In this case the main source file is merely a path, however, in more
+        // complicated build scripts, this could be a generated file.
+        .root_source_file = .{ .path = "src/main.zig" },
+        .target = target,
+        .optimize = optimize,
+    });
 
-    // Websocket module
-    const wsMod = b.dependency("websocket", .{ .target = target, .optimize = optimize});
-    exe.addModule("websocket", wsMod.module("websocket"));
+    // Compile in zigcv module
+    const zigcvMod = b.addModule("zigcv", .{ .root_source_file = .{ .path = "libs/zigcv.zig" } });
+    zigcvMod.addCSourceFiles(.{ .files = &.{
+        "libs/asyncarray.cpp",
+        "libs/calib3d.cpp",
+        "libs/core.cpp",
+        "libs/dnn.cpp",
+        "libs/features2d.cpp",
+        "libs/highgui.cpp",
+        "libs/imgcodecs.cpp",
+        "libs/imgproc.cpp",
+        "libs/objdetect.cpp",
+        "libs/photo.cpp",
+        "libs/svd.cpp",
+        "libs/version.cpp",
+        "libs/video.cpp",
+        "libs/videoio.cpp",
+        "libs/contrib/tracking.cpp",
+    }, .flags = &[_][]const u8{
+        "-Wall",
+        "-Wextra",
+        "-std=c++11",
+    } });
+    zigcvMod.addIncludePath(.{ .path = "include" });
+    zigcvMod.addIncludePath(.{ .path = "include/contrib" });
+    zigcvMod.addIncludePath(.{ .path = "/usr/local/include" });
+    zigcvMod.addIncludePath(.{ .path = "/usr/local/include/opencv4" });
+    exe.root_module.addImport("zigcv", zigcvMod);
 
+    // // Websocket module
+    const wsMod = b.dependency("websocket", .{ .target = target, .optimize = optimize });
+    exe.root_module.addImport("websocket", wsMod.module("websocket"));
 
-    exe.linkLibrary(cv);
-    exe.addIncludePath(.{ .path = "include" });
-    exe.addIncludePath(.{ .path = "include/contrib" });
-    exe.addIncludePath(.{ .path = "/usr/local/include" });
-    exe.addIncludePath(.{ .path = "/usr/local/include/opencv4" });
+    exe.linkLibC();
     exe.linkSystemLibrary("opencv4");
+    exe.linkSystemLibrary("simpleble-c");
     exe.linkSystemLibrary("unwind");
     exe.linkSystemLibrary("m");
     exe.linkSystemLibrary("c");
-
-    // This declares intent for the executable to be installed into the
-    // standard location when the user invokes the "install" step (the default
-    // step when running `zig build`).
+    exe.linkLibrary(cv); // neccessary?
     b.installArtifact(exe);
 
     // This *creates* a Run step in the build graph, to be executed when another
