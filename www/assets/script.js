@@ -31,12 +31,25 @@ const startBtn = 115
 const gameABtn = 97
 const gameBBtn = 98
 const gameCBtn = 99
+if ("serial" in navigator) {
+  navigator.serial.addEventListener("connect", async (event) => {
+    const port = event.target
+    console.log("connected port")
+    await port.open({ baudRate: 9600 })
+    buttonBoxWriter = port.writable.getWriter()
+    resetGame()
+  })
+
+  navigator.serial.addEventListener("disconnect", async (event) => {
+    const port = event.target
+    console.log("disconnected serialport")
+  })
+}
 
 document.getElementById("connectBtn").addEventListener("click", async(evt) => {
   // connect to shell game box
   if ("serial" in navigator) {
     try {
-      //const port = await navigator.serial.requestPort()
       const filters = [{ usbVendorId: 0x16c0, usbProductId: 0x0487 }]
       const port = await navigator.serial.requestPort({ filters })
       await port.open({ baudRate: 9600 })
@@ -247,7 +260,8 @@ ws.addEventListener("message", async event => {
     }
     img.src = window.URL.createObjectURL(blob)
     if (buttonBoxWriter) {
-      buttonLedOn(115)
+      resetButtonBox()
+      buttonLedOn(predictLetter.charCodeAt(0))
     }
     break
   case 8:
@@ -265,7 +279,10 @@ ws.addEventListener("message", async event => {
       return
     }
     img.src = window.URL.createObjectURL(blob)
-    buttonLedOn(verdictLetter.charCodeAt(0))
+    if (buttonBoxWriter) {
+      resetButtonBox()
+      buttonLedOn(verdictLetter.charCodeAt(0))
+    }
     showResults()
     break
   case 9:
