@@ -124,6 +124,16 @@ const httpServer = Bun.serve({
       }
       break
 
+    case "/api/loadmodel":
+      // load model in server memory
+      try {
+        const file = Bun.file("www/assets/model.json")
+        return new Response(file)
+      } catch(err) {
+        console.log(err)
+      }
+      break
+
     default:
       const filePath = BASE_PATH + url.pathname
       const file = Bun.file(filePath)
