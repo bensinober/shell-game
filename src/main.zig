@@ -51,14 +51,14 @@ const MsgHandler = struct {
             const mode: GameMode = @enumFromInt(msg.data[1]);
             lastGameMode = gameMode;
             gameMode = mode;
-            var mb: u8 = std.mem.asBytes(&gameMode)[0];
+            const mb: u8 = std.mem.asBytes(&gameMode)[0];
             std.log.debug("switched mode from: {any} to {any}", .{lastGameMode, gameMode});
             const res = try self.allocator.alloc(u8, 8);
             @memcpy(res, &[_]u8{0, mb, 2, 0, 0, 0, 0x4f, 0x4b}); // OK
             _ = try wsClient.writeBin(res);
         } else {
             const res = try self.allocator.alloc(u8, 9);
-            var mb: u8 = std.mem.asBytes(&gameMode)[0];
+            const mb: u8 = std.mem.asBytes(&gameMode)[0];
             @memcpy(res, &[_]u8{0, mb, 2, 0, 0, 0, 0x4e, 0x4f, 0x4b}); // NOK
             _ = try wsClient.write(res);
         }
@@ -84,7 +84,7 @@ const Result = struct {
 
 // This is the main tracking function for the game
 pub const Error = error{MissingFocus};
-const GameTracker = struct {
+const Tracker = struct {
     const Self = @This();
     allocator: Allocator,
     maxLife: i32,                 // num of frames to keep disappeared objects before removing them
@@ -98,10 +98,10 @@ const GameTracker = struct {
     fps: f64,
 
     pub fn init(allocator: Allocator) !Self {
-        var objs: ArrayList(Result) = ArrayList(Result).init(allocator);
-        var disapp: ArrayList(i32) = ArrayList(i32).init(allocator);
-        var timer = try std.time.Timer.start();
-        var overlay = try cv.Mat.initOnes( 640, 640, cv.Mat.MatType.cv8uc4); // CV_8UC4 for transparency
+        const objs: ArrayList(Result) = ArrayList(Result).init(allocator);
+        const disapp: ArrayList(i32) = ArrayList(i32).init(allocator);
+        const timer = try std.time.Timer.start();
+        const overlay = try cv.Mat.initOnes( 640, 640, cv.Mat.MatType.cv8uc4); // CV_8UC4 for transparency
 
         return Self{
             .maxLife = 10, // we keep a tracker alive for 10 frames, if not it is considered lost
@@ -153,8 +153,11 @@ const GameTracker = struct {
         }
         // failover object if lost focus
         if (self.lastFocusObj) | obj| {
-            std.debug.print("getFocusObj : LOST OBJECT, TRYING LAST KNOWN FOCUS ID {d}!\n", .{obj.id});
-            return obj;
+            // dont send last known object forever
+            if (obj.disappeared < self.maxLife) {
+                //std.debug.print("getFocusObj : LOST OBJECT, TRYING LAST KNOWN FOCUS ID {d}!\n", .{obj.id});
+                return obj;
+            }
         }
         return null;
     }
@@ -262,8 +265,8 @@ const GameTracker = struct {
         } else {
             // rows => tracked objects
             // cols => input objects
-            var rows = try allocator.alloc(f32, self.objects.items.len);
-            var cols = try allocator.alloc(f32, results.items.len);
+            const rows = try allocator.alloc(f32, self.objects.items.len);
+            const cols = try allocator.alloc(f32, results.items.len);
             // keep record of assigned trackers
 
             var usedTrackers = try allocator.alloc(bool, self.objects.items.len);
@@ -449,20 +452,15 @@ const GameTracker = struct {
 // yolov8 has an output of shape (batchSize, 84,  8400) (Num classes + box[x,y,w,h])
 // float x_factor = modelInput.cols / modelShape.width;
 // float y_factor = modelInput.rows / modelShape.height;
-fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *GameTracker, allocator: Allocator) !void {
+fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tracker, allocator: Allocator) !void {
     //try cv.imWrite("object.jpg", img.*);
-    //std.debug.print("rows {d}\n", .{rows});
-    //std.debug.print("cols {d}\n", .{cols});
-    const green = cv.Color{ .g = 255 };
-    const red = cv.Color{ .r = 255 };
-    var i: usize = 0;
-    //std.debug.print("shape input {any}\n", .{cols});
+    std.debug.print("scoreMat size: {any}\n", .{scoreMat.size()});
+
     // factor is model input / model shape
     // float x_factor = modelInput.cols / modelShape.width;
-    const iRow: f32 = @floatFromInt(img.cols());
-    const iCol: f32 = @floatFromInt(img.rows());
-    const xFact: f32 = iRow / 640.0;
-    const yFact: f32 = iCol / 640.0;
+
+    const imgWidth: f32 = @floatFromInt(img.cols());
+    const imgHeight: f32 = @floatFromInt(img.rows());
 
     var bboxes = ArrayList(cv.Rect).init(allocator);
     var centrs = ArrayList(cv.Point).init(allocator);
@@ -473,36 +471,43 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
     defer scores.deinit();
     defer classes.deinit();
 
-    // 1) first run, fetch all detections with a minimum score
-    while (i < rows) : (i += 1) {
-        // scores is a vector of results[0..4] (x,y,w,h) followed by scores for each class
-        // for this project, only two classes = total 6 floats
-        // row index is class id? no
-        // fetch the four class scores
-        var classScores = try results.region(cv.Rect.init(4, @intCast(i), CLASSES.len, 1));
-        //var classScores = try cv.Mat.initFromMat(results, 1, 4,results.getType(), 1, 4);
-        defer classScores.deinit();
+    var i: usize = 0;
+    // var firstRow = try scoreMat.region(cv.Rect.init(0, @intCast(i), 6, 1));
+    // defer firstRow.deinit();
+    // const fc = cv.Mat.minMaxLoc(firstRow);
+    // std.debug.print("first row {any} - {any}\n", .{firstRow, fc});
 
+    // YOLO-v8
+    // Mat is {8400, 84} (bounding_box, scores*80)
+    // bounding_box : [x_center, y_center, width, height]
+    const xFact: f32 =  imgWidth / 640.0;
+    const yFact: f32 =  imgHeight / 640.0;
+    while (i < rows) : (i += 1) {
+        // scores is a vector of results[0..4] (centr_x,centr_y,w,h) followed by clsid + 80 scores (for each class)
+        var classScores = try scoreMat.region(cv.Rect.init(4, @intCast(i), CLASSES.len, 1));
+        defer classScores.deinit();
         // minMaxLoc extracts max and min scores from entire result vector
         const sc = cv.Mat.minMaxLoc(classScores);
+        //std.debug.print("minmax val: {d:.2} {d:.2}: locmaxX {d} locmaxY {d}\n", .{sc.min_val, sc.max_val, sc.max_loc.x, sc.max_loc.y});
         if (sc.max_val > 0.30) {
-            //std.debug.print("results: class {s}: {any}, class {s}: {any}\n", .{CLASSES[0], results.get(f32, i, 4), CLASSES[1], results.get(f32, i, 5)});
-            //std.debug.print("scores {any}\n", .{sc});
-            // compose rect, score and confidence for detection
-            var x: f32 = results.get(f32, i, 0);
-            var y: f32 = results.get(f32, i, 1);
-            var w: f32 = results.get(f32, i, 2);
-            var h: f32 = results.get(f32, i, 3);
-            var left: i32 = @intFromFloat((x - 0.5 * w) * xFact);
-            var top: i32 = @intFromFloat((y - 0.5 * h) * yFact);
-            var width: i32 = @intFromFloat(w * xFact);
-            var height: i32 = @intFromFloat(h * yFact);
+            // std.debug.print("minMaxLoc: {any}\n", .{sc});
+            // left, top, right, bottom
+            const fcx: f32 = scoreMat.get(f32, i, 0);
+            const fcy: f32 = scoreMat.get(f32, i, 1);
+            const fw: f32 = scoreMat.get(f32, i, 2);
+            const fh: f32 = scoreMat.get(f32, i, 3);
+            //std.debug.print("imgW {d} imgH {d} fcx {d}, fcy {d}, fw {d}, fh {d}\n", .{imgWidth, imgHeight, fcx, fcy, fw, fh});
+            const left: i32 = @intFromFloat((fcx - 0.5 * fw) * xFact);
+            const top: i32 = @intFromFloat((fcy - 0.5 * fh) * yFact);
+            const width: i32 = @intFromFloat(fw * xFact);
+            const height: i32 = @intFromFloat(fh * yFact);
             const rect = cv.Rect{ .x = left, .y = top, .width = width, .height = height };
-            const cx: i32 = @intFromFloat(x * xFact);
-            const cy: i32 = @intFromFloat(y * yFact);
+            //const rect = cv.Rect{ .x = @intFromFloat(fxMin), .y = @intFromFloat(fyMin), .width = @intFromFloat(width), .height = @intFromFloat(height) };
+            const cx: i32 = @intFromFloat(fcx * xFact);
+            const cy: i32 = @intFromFloat(fcy * yFact);
             const centr: cv.Point = cv.Point.init(cx, cy);
-            //std.debug.print("class id {d}\n", .{sc.max_loc.x});  // yes, scores.max_loc is Point with x vector as class ID
-            //std.debug.print("confidence {d:.3}\n", .{sc.max_val});
+            //std.debug.print("rect: {any}\n", .{rect});
+            //std.debug.print("centr: {any}\n", .{centr});
             try centrs.append(centr);
             try bboxes.append(rect);
             try scores.append(@floatCast(sc.max_val));
@@ -565,7 +570,7 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
     tracker.frames += 1;
     if (tracker.frames >= 60) {
         const lap: u64 = tracker.getTimeSpent();
-        var flap: f64 = @floatFromInt(lap);
+        const flap: f64 = @floatFromInt(lap);
         const secs: f64 = flap / 1000000000;
         tracker.fps = tracker.frames / secs;
         tracker.frames = 0;
@@ -638,7 +643,7 @@ fn performDetection(img: *Mat, results: *Mat, rows: usize, _: i32, tracker: *Gam
 
 // UNUSED: methods to colorize / focus a bounding box
 pub fn colorizeBox(results: Mat) !Mat {
-    var out = try cv.Mat.initZeros(results.rows(), results.cols(), cv.Mat.MatType.cv8uc3);
+    const out = try cv.Mat.initZeros(results.rows(), results.cols(), cv.Mat.MatType.cv8uc3);
     return out;
 }
 
@@ -661,11 +666,11 @@ pub fn main() anyerror!void {
     const prog = args.next();
     const deviceIdChar = args.next() orelse {
         std.log.err("usage: {s} [cameraID] [model]", .{prog.?});
-        std.os.exit(1);
+        std.process.exit(1);
     };
     const model = args.next() orelse {
         std.log.err("usage: {s} [cameraID [model]]", .{prog.?});
-        std.os.exit(1);
+        std.process.exit(1);
     };
     args.deinit();
 
@@ -683,20 +688,39 @@ pub fn main() anyerror!void {
     defer window.deinit();
 
     // prepare image matrix
-    var img = try cv.Mat.init();
+    var img = try cv.Mat.initSize(640,640, cv.Mat.MatType.cv8uc3);
     defer img.deinit();
-    //img = try cv.imRead("object.jpg", .unchanged);
+    img = try cv.imRead("bus.jpg", .color);
+    //cv.cvtColor(inImg, &img, .bgra_to_bgr);
+    //tracker.overlay.copyTo(img);
+
     //img = try cv.imRead("cardboard_cup1-00022.png", .unchanged);
 
     //var img = try cv.Mat.initSize(640,640, cv.Mat.MatType.cv8uc3);
 
     // open DNN object tracking model
+    // YOLOv8 pytorch onnx INFERENCE
+    const swapRB = true;
     const scale: f64 = 1.0 / 255.0;
     const size: cv.Size = cv.Size.init(640, 640);
+    const mean = cv.Scalar.init(0, 0, 0, 0); // mean subtraction is a technique used to aid our Convolutional Neural Networks.
+    const crop = false;
     var net = cv.Net.readNetFromONNX(model) catch |err| {
         std.debug.print("Error: {any}\n", .{err});
-        std.os.exit(1);
+        std.process.exit(1);
     };
+
+    // YOLOv5n
+    // https://github.com/doleron/yolov5-opencv-cpp-python/blob/main/cpp/yolo.cpp
+    // const swapRB = true;
+    // const scale: f64 = 1.0 / 255.5;
+    // const size: cv.Size = cv.Size.init(640, 640);
+    // const mean = cv.Scalar.init(0, 0, 0, 0); // mean subtraction is a technique used to aid our Convolutional Neural Networks.
+    // const crop = false;
+    // var net = cv.Net.readNetFromONNX(model) catch |err| {
+    //     std.debug.print("Error: {any}\n", .{err});
+    //     std.process.exit(1);
+    // };
 
     // tensorflowjs mobilenet
     // const scale: f64 = 1.0 / 255.0;
@@ -704,22 +728,42 @@ pub fn main() anyerror!void {
     // var net = cv.Net.readNetFromTensorflow(model) catch |err| {
     //     //var net = cv.Net.readNet(model, "") catch |err| {
     //     std.debug.print("Error: {any}\n", .{err});
-    //     std.os.exit(1);
+    //     std.process.exit(1);
     // };
+
+    // efficientnet-lite4.onnx
+    // const scale: f64 = 1.0 / 255.0;
+    // const mean = cv.Scalar.init(0, 0, 0, 0); // mean subtraction is a technique used to aid our Convolutional Neural Networks.
+    // var transposeVector = [_]i32{0, 2, 3, 1}; // transpose a single-channel Mat against a vector
+    // const swapRB = true;
+    // const crop = false;
+    // const size: cv.Size = cv.Size.init(320, 320);
+    // var net = cv.Net.readNetFromONNX(model) catch |err| {
+    //     std.debug.print("Error: {any}\n", .{err});
+    //     std.process.exit(1);
+    // };
+
     defer net.deinit();
 
     if (net.isEmpty()) {
         std.debug.print("Error: could not load model\n", .{});
-        std.os.exit(1);
+        std.process.exit(1);
     }
 
     net.setPreferableBackend(.default);  // .default, .halide, .open_vino, .open_cv. .vkcom, .cuda
     net.setPreferableTarget(.fp16);       // .cpu, .fp32, .fp16, .vpu, .vulkan, .fpga, .cuda, .cuda_fp16
 
-    var layers = try net.getLayerNames(allocator);
-    std.debug.print("getLayerNames {any}\n", .{layers.len});
-    const unconnected = try net.getUnconnectedOutLayers(allocator);
-    std.debug.print("getUnconnectedOutLayers {any}\n", .{unconnected.items});
+    // const layers = try net.getLayerNames(allocator);
+    // std.debug.print("getLayerNames {s}\n", .{layers});
+    // const unconnected = try net.getUnconnectedOutLayers(allocator);
+    // std.debug.print("getUnconnectedOutLayers {any}\n", .{unconnected.items});
+    // const unconnected = try net.getUnconnectedOutLayersNames(allocator);
+    // std.debug.print("getUnconnectedOutLayersNames {s}\n", .{unconnected});
+
+    // for (unconnected.items) |li| {
+    //     const l = try net.getLayer(li);
+    //     std.debug.print("unconnected layer output {d}: {s}\n", .{li, l.getName()});
+    // }
 
 
     // TCP SOCKET listening server
@@ -751,54 +795,50 @@ pub fn main() anyerror!void {
     thread.detach();
 
     // centroid tracker to remember objects
-    var tracker = try GameTracker.init(allocator);
+    var tracker = try Tracker.init(allocator);
     //defer tracker.deinit();
-    const mean = cv.Scalar.init(0, 0, 0, 0); // mean subtraction is a technique used to aid our Convolutional Neural Networks.
-    const swapRB = true;
-    const crop = false;
 
     while (true) {
         webcam.read(&img) catch {
             std.debug.print("capture failed", .{});
-            std.os.exit(1);
+            std.process.exit(1);
         };
         if (img.isEmpty()) {
             continue;
         }
 
         img.flip(&img, 1); // flip horizontally
-        var squaredImg = try formatToSquare(img);
-        defer squaredImg.deinit();
-        cv.resize(squaredImg, &squaredImg, size, 0, 0, .{});
+
+        // var squaredImg = try formatToSquare(img);
+        // defer squaredImg.deinit();
+        // cv.resize(squaredImg, &squaredImg, size, 0, 0, .{});
 
         // transform image to CV matrix / 4D blob
-        var blob = try cv.Blob.initFromImage(squaredImg, scale, size, mean, swapRB, crop);
+        var blob = try cv.Blob.initFromImage(img, scale, size, mean, swapRB, crop);
         defer blob.deinit();
-        // run inference on Matrix
-        // prob result: objid, classid, confidence, left, top, right, bottom.
-        net.setInput(blob, "");
-        var probs = try net.forward("");
-        //var probs = try net.forward("output0");
-        defer probs.deinit();
+        std.debug.print("input blob size {any}\n", .{blob.mat.size()});
 
-        //const rows = probMat.get(i32, 0, 0);
-        //const dimensions = probMat.get(i32, 0, 1);
-        //std.debug.print("probmat size {any}\n", .{probs.size()});
-
-        // Yolo v8 reshape
-        // xywh vector + numclasses * 8400 rows
-        const rows: usize = @intCast(probs.size()[2]);
-        const dims: i32 = probs.size()[1];
-
-        var probMat = try probs.reshape(1, @intCast(dims));
-        defer probMat.deinit();
-        //std.debug.print("probMat dimensions {any} rows {any} dims {any}\n", .{probs.size(), rows, dims});
-        cv.Mat.transpose(probMat, &probMat);
+        // YOLOv8 INFERENCE
         // yolov8 has an output of shape (batchSize, 84,  8400) (Num classes + box[x,y,w,h])
-        try performDetection(&squaredImg, &probMat, rows, dims, &tracker, allocator);
-        // time frames per sec
+        // prob result: objid, classid, confidence, left, top, right, bottom.
+        // input: {1, 3, 640, 640} (b,ch,w,h)
+        // output {1, 84,  8400} scores and boxes
+        net.setInput(blob, "");
+        var probs = try net.forward("output0");
+        defer probs.deinit();
+        std.debug.print("orig probMat size {any},\n", .{probs.size()});
+        const rows: usize = @intCast(probs.size()[2]);
+        const dims: usize = @intCast(probs.size()[1]);
+        var probMat = try probs.reshape(1, dims);
+        std.debug.print("reshaped probMat size {any},\n", .{probMat.size()});
+        defer probMat.deinit();
+        cv.Mat.transpose(probMat, &probMat);
+        //var transposeVector = [_]i32{0, 2, 1};
+        //cv.Mat.transposeND(probs, &transposeVector, &probs);
+        std.debug.print("transposed probmat size {any}\n", .{probMat.size()});
+        try performDetection(&img, probMat, rows, size, &tracker, allocator);
 
-        window.imShow(squaredImg);
+        window.imShow(img);
         if (window.waitKey(1) == 27) {
             break;
         }

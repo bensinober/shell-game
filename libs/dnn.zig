@@ -156,6 +156,13 @@ pub const Net = struct {
         return try initFromC(nn_ptr);
     }
 
+    pub fn readNetFromDarknet(cfg: []const u8, model: []const u8) !Self {
+        _ = try ensureFileExists(cfg, false);
+        _ = try ensureFileExists(model, false);
+        const nn_ptr = c.Net_ReadNetFromDarknet(@as([*]const u8, @ptrCast(cfg)), @as([*]const u8, @ptrCast(model)));
+        return try initFromC(nn_ptr);
+    }
+
     pub fn readNetFromCaffeBytes(prototxt: []u8, caffe_model: []u8) !Self {
         const c_prototxt = core.toByteArray(prototxt);
         const c_caffe_model = core.toByteArray(caffe_model);
@@ -163,9 +170,10 @@ pub const Net = struct {
         return try initFromC(nn_ptr);
     }
 
-    pub fn readNetFromTensorflow(model: []const u8) !Self {
+    pub fn readNetFromTensorflow(model: []const u8, pbtxt: []const u8) !Self {
+        _ = try ensureFileExists(pbtxt, false);
         _ = try ensureFileExists(model, false);
-        const nn_ptr = c.Net_ReadNetFromTensorflow(@as([*]const u8, @ptrCast(model)));
+        const nn_ptr = c.Net_ReadNetFromTensorflow(@as([*]const u8, @ptrCast(model)), @as([*]const u8, @ptrCast(pbtxt)));
         return try initFromC(nn_ptr);
     }
 
@@ -270,6 +278,32 @@ pub const Net = struct {
         return return_res;
     }
 
+    // Returns names of layers with unconnected outputs.
+    // FIXIT: Rework API to registerOutput() approach, deprecate this call
+    // https://docs.opencv.org/4.x/db/d30/classcv_1_1dnn_1_1Net.html#ac1840896b8643f91532e98c660627fb9
+    pub fn getUnconnectedOutLayersNames(self: Self, allocator: std.mem.Allocator) ![][]const u8 {
+        var c_strs: c.CStrings = undefined;
+        //defer c.CStrings_Close(c_strs);
+        c.Net_GetUnconnectedOutLayersNames(self.ptr, &c_strs);
+        const len = @as(usize, @intCast(c_strs.length));
+        const return_strings = try allocator.alloc([]const u8, len);
+
+        for (return_strings, 0..) |*item, i| {
+            item.* = try allocator.dupe(u8, std.mem.span(c_strs.strs[i]));
+        }
+        // for (return_strings.items, 0..) |_, i| {
+        //     const layerName = std.mem.span(c_strs.strs[i]);
+        //     std.debug.print("Layer name {any}\n", .{layerName});
+        //     return_strings.items[i] = try allocator.dupe(u8, layerName);
+        // }
+        // var i: usize = 0;
+        // while (i < c_strs.length) : (i += 1) {
+        //     const str = std.mem.sliceTo(c_strs.strs[i], 0);
+        //     try return_strings.append(str);
+        // }
+        return return_strings;
+    }
+
     // Get list of layer names used. Returns array of strings
     // https://docs.opencv.org/4.8.0/db/d30/classcv_1_1dnn_1_1Net.html#ae62a73984f62c49fd3e8e689405b056a
     pub fn getLayerNames(self: Self, allocator: std.mem.Allocator) ![][]const u8 {
@@ -277,7 +311,7 @@ pub const Net = struct {
         //defer c.CStrings_Close(c_strs);
         c.Net_GetLayerNames(self.ptr, &c_strs);
         const len = @as(usize, @intCast(c_strs.length));
-        var return_strings = try allocator.alloc([]const u8, len);
+        const return_strings = try allocator.alloc([]const u8, len);
 
         for (return_strings, 0..) |*item, i| {
             item.* = try allocator.dupe(u8, std.mem.span(c_strs.strs[i]));
@@ -328,7 +362,7 @@ pub const Blob = struct {
             swap_rb,
             crop,
         );
-        var new_blob_mat = try Mat.initFromC(new_c_blob);
+        const new_blob_mat = try Mat.initFromC(new_c_blob);
         return try initFromMat(new_blob_mat);
     }
 
@@ -349,7 +383,7 @@ pub const Blob = struct {
         ddepth: Mat.MatType,
     ) !Self {
         var new_blob_mat = try Mat.init();
-        var c_mats = try Mat.toCStructs(images);
+        const c_mats = try Mat.toCStructs(images);
         c.Net_BlobFromImages(
             c_mats,
             new_blob_mat.toC(),
@@ -450,7 +484,7 @@ pub fn nmsBoxes(
         .length = @as(i32, @intCast(bboxes.len)),
     };
 
-    var c_scores_struct = c.FloatVector{
+    const c_scores_struct = c.FloatVector{
         .val = @as([*]f32, @ptrCast(scores.ptr)),
         .length = @as(i32, @intCast(scores.len)),
     };
@@ -554,6 +588,7 @@ pub fn nmsBoxesWithParams(
 //*    pub extern fn Net_SetPreferableTarget(net: Net, target: c_int) void;
 //*    pub extern fn Net_GetPerfProfile(net: Net) i64;
 //*    pub extern fn Net_GetUnconnectedOutLayers(net: Net, res: [*c]IntVector) void;
+//*    pub extern fn Net_GetUnconnectedOutLayersNames(net: Net, names: [*c]CStrings) void;
 //*    pub extern fn Net_GetLayerNames(net: Net, names: [*c]CStrings) void;
 //*    pub extern fn Net_GetBlobChannel(blob: Mat, imgidx: c_int, chnidx: c_int) Mat;
 //*    pub extern fn Net_GetBlobSize(blob: Mat) Scalar;

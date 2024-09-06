@@ -1,9 +1,11 @@
 // Bun server with websocket and static file serving
 import { Database } from "bun:sqlite"
 const db = new Database("shell-game.db")
+
 db.exec("PRAGMA journal_mode = WAL;")
 const BASE_PATH = "./www"
 var pendingBuffer,pendingCmd, pendingSize, pendingMode
+
 const httpServer = Bun.serve({
   port: 8665,
   host: "0.0.0.0",

@@ -412,7 +412,7 @@ pub fn initFromScalar(s: Scalar, mt: MatType) !Self {
 }
 
 pub fn initFromBytes(rows_: i32, cols_: i32, bytes: []u8, mt: MatType) !Self {
-    var c_bytes = c.ByteVector{
+    const c_bytes = c.ByteVector{
         .val = @ptrCast(bytes),
         .length = @intCast(bytes.len),
     };
@@ -439,7 +439,7 @@ pub fn initSizesFromBytes(size_array: []const i32, bytes: []u8, mt: MatType) !Se
         .val = @ptrCast(size_array),
         .length = @intCast(size_array.len),
     };
-    var c_bytes = c.ByteVector{
+    const c_bytes = c.ByteVector{
         .val = @ptrCast(bytes),
         .length = @intCast(bytes.len),
     };
@@ -535,7 +535,7 @@ pub fn channels(self: Self) i32 {
 }
 
 pub fn getType(self: Self) MatType {
-    var type_ = c.Mat_Type(self.ptr);
+    const type_ = c.Mat_Type(self.ptr);
     return @enumFromInt(type_);
 }
 
@@ -1012,7 +1012,7 @@ pub fn meanStdDev(self: Self, dst_mean: *Self, dst_std_dev: *Self) void {
 /// https://docs.opencv.org/master/d2/de8/group__core__array.html#ga7d7b4d6c6ee504b30a20b1680029c7b4
 ///
 pub fn merge(mats: []Self, dest: *Self) void {
-    var c_mats = toCStructs(mats);
+    const c_mats = toCStructs(mats);
     defer deinitCStructs(c_mats);
     c.Mat_Merge(c_mats, dest.*.ptr);
 }
@@ -1264,15 +1264,15 @@ pub fn dataPtr(self: Self, comptime T: type) ![]T {
         return error.RuntimeError;
     }
 
-    var p: c.ByteArray = c.Mat_DataPtr(self.ptr);
-    var len: usize = @intCast(p.length);
+    const p: c.ByteArray = c.Mat_DataPtr(self.ptr);
+    const len: usize = @intCast(p.length);
     const bit_scale = @sizeOf(T) / @sizeOf(u8);
     return @as([*]T, @ptrCast(@alignCast(p.data)))[0 .. len / bit_scale];
 }
 
 pub fn toBytes(self: Self) []u8 {
-    var p: c.struct_ByteArray = c.Mat_ToBytes(self.ptr);
-    var len: usize = @intCast(p.length);
+    const p: c.struct_ByteArray = c.Mat_ToBytes(self.ptr);
+    const len: usize = @intCast(p.length);
     return p[0..len];
 }
 
@@ -1308,6 +1308,19 @@ pub fn t(self: Self) Self {
 //
 pub fn transpose(self: Self, dst: *Self) void {
     _ = c.Mat_Transpose(self.ptr, dst.*.ptr);
+}
+
+// Transpose an N-dimentional matrix given an int vector
+//
+// For further details, please see:
+// https://docs.opencv.org/4.x/d2/de8/group__core__array.html#gab1b1274b4a563be34cdfa55b8919a4ec
+//
+pub fn transposeND(self: Self, order: []i32, dst: *Self) void {
+    const c_order = c.struct_IntVector{
+        .val = @ptrCast(order.ptr),
+        .length = @intCast(order.len),
+    };
+    _ = c.Mat_TransposeND(self.ptr, c_order, dst.*.ptr);
 }
 
 // PolatToCart calculates x and y coordinates of 2D vectors from their magnitude and angle.
@@ -1363,9 +1376,9 @@ pub fn sum(self: Self) Scalar {
 // For further details, please see:
 // https://docs.opencv.org/master/d3/d63/classcv_1_1Mat.html#aa6542193430356ad631a9beabc624107
 //
-pub fn rowRange(self: Self, startrow: i32, endrow: i32) Self {
+pub fn rowRange(self: Self, startrow: i32, endrow: i32) !Self {
     const ptr = c.Mat_rowRange(self.ptr, startrow, endrow);
-    return initFromC(ptr);
+    return try initFromC(ptr);
 }
 
 // ColRange creates a matrix header for the specified column span.
@@ -1373,9 +1386,9 @@ pub fn rowRange(self: Self, startrow: i32, endrow: i32) Self {
 // For further details, please see:
 // https://docs.opencv.org/master/d3/d63/classcv_1_1Mat.html#aadc8f9210fe4dec50513746c246fa8d9
 //
-pub fn colRange(self: Self, startcol: i32, endcol: i32) Self {
+pub fn colRange(self: Self, startcol: i32, endcol: i32) !Self {
     const ptr = c.Mat_colRange(self.ptr, startcol, endcol);
-    return initFromC(ptr);
+    return try initFromC(ptr);
 }
 
 // PatchNaNs converts NaN's to zeros.
@@ -1544,7 +1557,7 @@ pub fn sortIdx(self: Self, dst: *Self, flags: SortFlags) void {
 pub fn split(self: Self, allocator: std.mem.Allocator) !Mats {
     var c_mats: c.struct_Mats = undefined;
     c.Mat_Split(self.ptr, &c_mats);
-    var mats = try toArrayList(c_mats, allocator);
+    const mats = try toArrayList(c_mats, allocator);
     return .{ .list = mats };
 }
 
@@ -1554,7 +1567,7 @@ pub fn split(self: Self, allocator: std.mem.Allocator) !Mats {
 /// https://docs.opencv.org/master/d2/de8/group__core__array.html#ga3419ac19c7dcd2be4bd552a23e147dd8
 ///
 pub fn trace(self: Self) Scalar {
-    var s = c.Mat_Trace(self.ptr);
+    const s = c.Mat_Trace(self.ptr);
     return Scalar.initFromC(s);
 }
 
@@ -1639,11 +1652,11 @@ pub fn minMaxLoc(self: Self) struct {
 ///
 //     pub extern fn Mat_MixChannels(src: struct_Mats, dst: struct_Mats, fromTo: struct_IntVector) void;
 pub fn mixChannels(src: []Self, dst: *[]Self, from_to: []i32) !void {
-    var c_src = toCStructs(src);
+    const c_src = toCStructs(src);
     defer deinitCStructs(c_src);
-    var c_dst = toCStructs(dst.*);
+    const c_dst = toCStructs(dst.*);
     defer deinitCStructs(c_dst);
-    var c_from_to = c.struct_IntVector{
+    const c_from_to = c.struct_IntVector{
         .val = @ptrCast(from_to.ptr),
         .length = @intCast(from_to.len),
     };
@@ -1665,7 +1678,7 @@ pub fn mulSpectrums(self: Self, src2: Self, dst: *Self, flags: DftFlags) void {
 }
 
 pub fn toArrayList(c_mats: c.Mats, allocator: std.mem.Allocator) !Mats {
-    var mat_array = try utils.fromCStructsToArrayList(c_mats.mats, c_mats.length, Self, allocator);
+    const mat_array = try utils.fromCStructsToArrayList(c_mats.mats, c_mats.length, Self, allocator);
     return .{ .list = mat_array };
 }
 
@@ -1848,6 +1861,7 @@ pub const Mats = struct {
 //*    pub extern fn Mat_Trace(src: Mat) Scalar;
 //*    pub extern fn Mat_Transform(src: Mat, dst: Mat, tm: Mat) void;
 //*    pub extern fn Mat_Transpose(src: Mat, dst: Mat) void;
+//*    pub extern fn Mat_TransposeND(src: Mat, []i32, dst: Mat) void;
 //*    pub extern fn Mat_PolarToCart(magnitude: Mat, degree: Mat, x: Mat, y: Mat, angleInDegrees: bool) void;
 //*    pub extern fn Mat_Pow(src: Mat, power: f64, dst: Mat) void;
 //*    pub extern fn Mat_Phase(x: Mat, y: Mat, angle: Mat, angleInDegrees: bool) void;

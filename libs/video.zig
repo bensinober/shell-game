@@ -2,6 +2,7 @@ const std = @import("std");
 const c = @import("c_api.zig");
 const core = @import("core.zig");
 const utils = @import("utils.zig");
+const dnn = @import("dnn.zig");
 const assert = std.debug.assert;
 const epnn = utils.ensurePtrNotNull;
 const Mat = core.Mat;
@@ -304,7 +305,7 @@ pub const Tracker = struct {
             pub fn update(self: *Self, image: Mat) UpdateReturn {
                 var c_box: c.Rect = undefined;
                 const success = c.Tracker_Update(self.ptr, image.toC(), @ptrCast(&c_box));
-                var rect = Rect.initFromC(c_box);
+                const rect = Rect.initFromC(c_box);
                 return UpdateReturn{
                     .box = rect,
                     .success = success,
@@ -576,7 +577,7 @@ test "video findTransformECC" {
     defer map_translation.deinit();
     const eec_iteration = 50;
     const eec_epsilon = -1;
-    var ct = try core.TermCriteria.init(.{ .count = true, .eps = true }, eec_iteration, eec_epsilon);
+    const ct = try core.TermCriteria.init(.{ .count = true, .eps = true }, eec_iteration, eec_epsilon);
 
     var input_mask = try Mat.init();
     defer input_mask.deinit();

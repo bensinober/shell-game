@@ -6,10 +6,7 @@ The next step in effective machine learning by letting machine learning annotate
 and then train on them for an effective, fast and simple model to be used in Computer vision and DNN
 (deep neural network).
 
-### How is this possible?
+## AutoAnnoter
 
-To be continued
-
-### How to do this simple?
-
-To be continued
+Similar computer vision training framework for automatic annotating and labeling images based on pre-trained
+neural networks. Supports segmentation and the Yolo (You only look once) version 8.

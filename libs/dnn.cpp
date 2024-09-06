@@ -12,6 +12,11 @@ Net Net_ReadNetBytes(const char* framework, struct ByteArray model, struct ByteA
     return n;
 }
 
+Net Net_ReadNetFromDarknet(const char* cfg, const char* model) {
+    Net n = new cv::dnn::Net(cv::dnn::readNetFromDarknet(cfg, model));
+    return n;
+}
+
 Net Net_ReadNetFromCaffe(const char* prototxt, const char* caffeModel) {
     Net n = new cv::dnn::Net(cv::dnn::readNetFromCaffe(prototxt, caffeModel));
     return n;
@@ -23,8 +28,8 @@ Net Net_ReadNetFromCaffeBytes(struct ByteArray prototxt, struct ByteArray caffeM
     return n;
 }
 
-Net Net_ReadNetFromTensorflow(const char* model) {
-    Net n = new cv::dnn::Net(cv::dnn::readNetFromTensorflow(model));
+Net Net_ReadNetFromTensorflow(const char* model, const char* pbtxt) {
+    Net n = new cv::dnn::Net(cv::dnn::readNetFromTensorflow(model, pbtxt));
     return n;
 }
 
@@ -106,6 +111,19 @@ void Net_GetUnconnectedOutLayers(Net net, IntVector* res) {
 
     res->length = cids.size();
     res->val = ids;
+    return;
+}
+
+void Net_GetUnconnectedOutLayersNames(Net net, CStrings* names) {
+    std::vector< cv::String > cstrs(net->getUnconnectedOutLayersNames());
+    const char **strs = new const char*[cstrs.size()];
+
+    for (size_t i = 0; i < cstrs.size(); ++i) {
+        strs[i] = cstrs[i].c_str();
+    }
+
+    names->length = cstrs.size();
+    names->strs = strs;
     return;
 }
 
