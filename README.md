@@ -2,13 +2,13 @@
 
 Machine learning and computer vision in a shell game contest
 
-This project is primarily for Oslo Skaperfestival 2023, but is an open-minded machine learning project
-intended to test some strategies for using neural networks and computer vision to see if we
-can train a machine in the ancient shell game
+Can we train a robot on the ancient shell game contest?
 
-![robot game](docs/shell-game.png)
-
-![segmented view](docs/segmented-cups.png)
+![shell game](docs/shell-game.png)
+![shell game live](docs/shell-game.jpg)
+![new head](docs/new-head.jpg)
+![slides](docs/ooxp4z2esq_slideimg.png)
+![predict](docs/ooxp4z2esq_predict.png)
 
 ## Rules of the game
 
