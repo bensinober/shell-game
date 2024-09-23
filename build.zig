@@ -21,12 +21,11 @@ pub fn build(b: *std.Build) void {
         .target = target,
         .optimize = optimize,
     });
-    cv.addIncludePath(.{ .path = "include" });
-    cv.addIncludePath(.{ .path = "include/contrib" });
-    cv.addLibraryPath(.{ .path = "libs" });
-    cv.addLibraryPath(.{ .path = "libs/contrib" });
-    cv.addIncludePath(.{ .path = "/usr/local/include" });
-    cv.addIncludePath(.{ .path = "/usr/local/include/opencv4" });
+    cv.addIncludePath(b.path("include"));
+    cv.addIncludePath(b.path("include/contrib"));
+    cv.addLibraryPath(b.path("libs"));
+    cv.addLibraryPath(b.path("libs/contrib"));
+    cv.addIncludePath(b.path("include/opencv4")); // linked in from /usr/local/include/opencv4
     cv.addCSourceFiles(.{ .files = &.{
         "libs/asyncarray.cpp",
         "libs/calib3d.cpp",
@@ -58,13 +57,13 @@ pub fn build(b: *std.Build) void {
         .name = "shell-game",
         // In this case the main source file is merely a path, however, in more
         // complicated build scripts, this could be a generated file.
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
 
     // Compile in zigcv module
-    const zigcvMod = b.addModule("zigcv", .{ .root_source_file = .{ .path = "libs/zigcv.zig" } });
+    const zigcvMod = b.addModule("zigcv", .{ .root_source_file = b.path("libs/zigcv.zig") });
     zigcvMod.addCSourceFiles(.{ .files = &.{
         "libs/asyncarray.cpp",
         "libs/calib3d.cpp",
@@ -86,10 +85,9 @@ pub fn build(b: *std.Build) void {
         "-Wextra",
         "-std=c++11",
     } });
-    zigcvMod.addIncludePath(.{ .path = "include" });
-    zigcvMod.addIncludePath(.{ .path = "include/contrib" });
-    zigcvMod.addIncludePath(.{ .path = "/usr/local/include" });
-    zigcvMod.addIncludePath(.{ .path = "/usr/local/include/opencv4" });
+    zigcvMod.addIncludePath(b.path("include"));
+    zigcvMod.addIncludePath(b.path("include/contrib"));
+    zigcvMod.addIncludePath(b.path("include/opencv4")); // linked in from /usr/local/include/opencv4
     exe.root_module.addImport("zigcv", zigcvMod);
 
     // // Websocket module
@@ -131,7 +129,7 @@ pub fn build(b: *std.Build) void {
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.
     const unit_tests = b.addTest(.{
-        .root_source_file = .{ .path = "src/main.zig" },
+        .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
     });
