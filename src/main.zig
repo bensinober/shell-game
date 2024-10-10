@@ -10,19 +10,8 @@ const Size = cv.Size;
 // *** GLOBALS ***
 pub const io_mode = .evented;
 // shell game
-var CLASSES = [_][]const u8{ "red_cup", "ball" };
+var CLASSES = [_][]const u8{ "red_cup", "green_disc" };
 
-// COCO
-// var CLASSES = [_][]const u8{
-//     "person",       "bicycle",   "car",           "motorcycle", "airplane",     "bus",            "train",      "truck",      "boat",          "traffic light",
-//     "fire hydrant", "stop sign", "parking meter", "bench",      "bird",         "cat",            "dog",        "horse",      "sheep",         "cow",
-//     "elephant",     "bear",      "zebra",         "giraffe",    "backpack",     "umbrella",       "handbag",    "tie",        "suitcase",      "frisbee",
-//     "skis",         "snowboard", "sports ball",   "kite",       "baseball bat", "baseball glove", "skateboard", "surfboard",  "tennis racket", "bottle",
-//     "wine glass",   "cup",       "fork",          "knife",      "spoon",        "bowl",           "banana",     "apple",      "sandwich",      "orange",
-//     "broccoli",     "carrot",    "hot dog",       "pizza",      "donut",        "cake",           "chair",      "couch",      "potted plant",  "bed",
-//     "dining table", "toilet",    "tv",            "laptop",     "mouse",        "remote",         "keyboard",   "cell phone", "microwave",     "oven",
-//     "toaster",      "sink",      "refrigerator",  "book",       "clock",        "vase",           "scissors",   "teddy bear", "hair drier",    "toothbrush",
-// };
 const green = cv.Color{ .g = 255 };
 const red = cv.Color{ .r = 255 };
 
@@ -797,14 +786,21 @@ pub fn main() anyerror!void {
     // const msgThread = try std.Thread.spawn(.{}, MsgHandler, .{&client});
     // defer msgThread.join();
 
-    // Game mode manager in separate thread
-    wsClient = try websocket.connect(allocator, "localhost", 8665, .{});
+    var certBundle: std.crypto.Certificate.Bundle = .{};
+    defer certBundle.deinit(allocator);
+    var certFile = try std.fs.cwd().openFile("cert.pem", .{});
+    defer certFile.close();
+
+    _ = try std.crypto.Certificate.Bundle.addCertsFromFile(&certBundle, allocator, certFile);
+    wsClient = try websocket.connect(allocator, "localhost", 8665, .{ .tls = true, .ca_bundle = certBundle });
     defer wsClient.deinit();
+
 
     try wsClient.handshake("/ws?channels=shell-game", .{
          .timeout_ms = 5000,
          .headers = "host: localhost:8665\r\n",
     });
+    // Game mode manager in separate thread
     const msgHandler = MsgHandler{.allocator = allocator};
     const thread = try wsClient.readLoopInNewThread(msgHandler);
     thread.detach();
