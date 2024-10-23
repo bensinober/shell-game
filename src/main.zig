@@ -694,13 +694,13 @@ pub fn main() anyerror!void {
     // prepare image matrix
     var img = try cv.Mat.initSize(640,640, cv.Mat.MatType.cv8uc3);
     defer img.deinit();
-    img = try cv.imRead("bus.jpg", .color);
-    //cv.cvtColor(inImg, &img, .bgra_to_bgr);
-    //tracker.overlay.copyTo(img);
 
-    //img = try cv.imRead("cardboard_cup1-00022.png", .unchanged);
+    // centroid tracker to remember objects
+    var tracker = try Tracker.init(allocator);
+    //defer tracker.deinit();
 
-    //var img = try cv.Mat.initSize(640,640, cv.Mat.MatType.cv8uc3);
+    cv.cvtColor(img, &img, .bgra_to_bgr);
+    tracker.overlay.copyTo(&img);
 
     // open DNN object tracking model
     // YOLOv8 pytorch onnx INFERENCE
@@ -804,10 +804,6 @@ pub fn main() anyerror!void {
     const msgHandler = MsgHandler{.allocator = allocator};
     const thread = try wsClient.readLoopInNewThread(msgHandler);
     thread.detach();
-
-    // centroid tracker to remember objects
-    var tracker = try Tracker.init(allocator);
-    //defer tracker.deinit();
 
     while (true) {
         webcam.read(&img) catch {
