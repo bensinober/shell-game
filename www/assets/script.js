@@ -19,8 +19,8 @@ var slideCnt = 0
 var uuid
 const cmdBuf = new ArrayBuffer(6)
 const dvCmd = new DataView(cmdBuf)
-dvCmd.setUint8(0, 1) // command
-dvCmd.setInt32(2, 0, true) // command length 0, little endian
+//dvCmd.setUint8(0, 1) // command
+//dvCmd.setInt32(2, 0, true) // command length 0, little endian
 
 ///////////////////////////////////
 // INPUT FROM SHELL GAME BUTTON BOX
@@ -31,6 +31,7 @@ const startBtn = 115
 const gameABtn = 97
 const gameBBtn = 98
 const gameCBtn = 99
+/*
 if ("serial" in navigator) {
   navigator.serial.addEventListener("connect", async (event) => {
     const port = event.target
@@ -45,7 +46,8 @@ if ("serial" in navigator) {
     console.log("disconnected serialport")
   })
 }
-
+*/
+// user action needed to use web serial or web bluetooth, so we trigger by connect button
 document.getElementById("connectBtn").addEventListener("click", async(evt) => {
   // connect to shell game box
   if ("serial" in navigator) {
@@ -76,6 +78,7 @@ document.getElementById("connectBtn").addEventListener("click", async(evt) => {
   }
 })
 
+// Keypress either by keyboard or by serial connected shell game box using HID
 document.addEventListener("keypress", (event) => {
   event.preventDefault()
   switch (event.key) {
@@ -173,7 +176,7 @@ function centroidToLetter(centroid) {
   }
 }
 
-const ws = new WebSocket("ws://localhost:8665/ws?channels=shell-game")
+const ws = new WebSocket("wss://localhost:8665/ws?channels=shell-game")
 ws.addEventListener("open", event => ws.binaryType = "arraybuffer")
 ws.addEventListener("message", async event => {
   //console.log(`INCOMING: ${event.data}`)
@@ -345,8 +348,7 @@ function clearData() {
   verdictLetter = ""
   predictSeq = ""
   uuid = genUUID()
-  dvCmd.setUint8(1, 4) // GameMode.TRACK_BALL
-  ws.send(new Uint8Array(cmdBuf))
+  sendGameMode(4)
 }
 
 function showResults() {
@@ -389,64 +391,6 @@ function popUpOverlay(text) {
     }, 3000)
 }
 
-/////////////////////////
-// BUTTON EVENT LISTENERS
-/////////////////////////
-
-// simple countdown timer
-document.getElementById("startBtn").addEventListener("click", function(evt) {
-  document.getElementById("startBtn").classList.remove("open")
-  showOverlay("snurr i vei!")
-  clearData()
-  duration = 18 // one game = 18 secs
-  slideCnt = 0
-  timerId = setInterval(function (evt) {
-    if(duration <= 0) {
-      // FINISHED
-      clearInterval(timerId)
-      document.querySelector(".countdownTimer").innerHTML = "FERDIG!"
-      setTimeout(() => {
-        document.querySelector(".countdownTimer").innerHTML = ""
-      }, 1000)
-      dvCmd.setUint8(1, 2) // GameMode.STOP
-      ws.send(new Uint8Array(cmdBuf))
-      buttonLedOn(startBtn)
-      document.getElementById("predictBtn").classList.add("open")
-      hideOverlay()
-    } else {
-      document.querySelector(".countdownTimer").innerHTML = "00:" + duration.toString().padStart(2, "0")
-      dvCmd.setUint8(1, 3) // GameMode.SNAP
-      ws.send(new Uint8Array(cmdBuf))
-      if (duration < 4) {
-        let mySound = new Audio("assets/beep-09.wav")
-        mySound.play()
-      }
-    }
-    duration -= 1
-    slideCnt += 1
-  }, 1000)
-})
-
-//document.getElementById("eyesBtn").addEventListener("click", function(evt) {
-//  console.log("EYES")
-//  popUpOverlay("my eyes see you!")
-//})
-document.getElementById("predictBtn").addEventListener("click", function(evt) {
-  console.log("PREDICT")
-  dvCmd.setUint8(1, 7) // GameMode.PREDICT
-  ws.send(new Uint8Array(cmdBuf))
-  document.getElementById("predictBtn").classList.remove("open")
-  document.getElementById("verdictBtn").classList.add("open")
-})
-
-document.getElementById("verdictBtn").addEventListener("click", function(evt) {
-  console.log("VERDICT")
-  dvCmd.setUint8(1, 8) // GameMode.VERDICT
-  ws.send(new Uint8Array(cmdBuf))
-  document.getElementById("verdictBtn").classList.remove("open")
-  document.getElementById("startBtn").classList.add("open")
-})
-
 ////////////////////
 // WEB Bluetooth API
 // emulates a serial port
@@ -469,28 +413,40 @@ var btCharacteristic // the btle char device to send centroids to
 // transpond x, y (640,640) to u8 (255,255)
 async function writeToEyes(x, y) {
     const x1 = Math.round(x / 640 * 255)
+    //const y1  = Math.round(y / 640 * 200)
     //const x1 = Math.round(Math.abs((640 - x) / 640 * 255)) // invert x-axis
-    const y1  =Math.round(Math.abs((640 - y) / 640 * 50)) // invert and compress y-axis
-    const cmd = new Uint8Array([ 0, 2, x1, y1 ])
-    await btCharacteristic.writeValueWithoutResponse(cmd);
-    //console.log(`in: (${x}, ${y}) -- written (${x1}, ${y1})`)
+    const y1  = Math.round((640 - y) / 640 * 255) // invert and compress y-axis
+    const cmd = new Uint8Array([ 0, 2, x1, y1, 13 ])
+    const res = await btCharacteristic.writeValueWithoutResponse(cmd)
+    console.log(res)
+    console.log(`in: (${x}, ${y}) -- written (${x1}, ${y1})`)
 }
 
+
 async function connectToEyes() {
-  const serviceUUID = 0xffe0;
-  const serialUUID = 0xffe1 //       0000ffe1-0000-1000-8000-00805f9b34fb
-  const characteristicUUID = 0xffe1
+  // benjis microbbit
+  // fb:c9:6d:cb:9d:63
+  // service UUID:         e2e00001-15cf-4074-9331-6fac42a4920b
+  // characteristics UUID: e2e00002-15cf-4074-9331-6fac42a4920b
+  const serviceUUID = "e2e00001-15cf-4074-9331-6fac42a4920b"
+  const characteristicUUID = "e2e00002-15cf-4074-9331-6fac42a4920b" // serial
+
+  // hm10 robot eyes
+  //const serviceUUID = 0xffe0;
+  //const characteristicUUID = 0xffe1
 
   try {
     console.log("Requesting Bluetooth Device...")
     //var ble = await navigator.bluetooth.getAvailability()
     const btDevice = await navigator.bluetooth.requestDevice({
-      //acceptAllDevices: true,
-      filters: [{ services: [serviceUUID] }], // fake service to send raw data as serial
+      acceptAllDevices: true,
+      //filters: [ {services: ["e2e00001-15cf-4074-9331-6fac42a4920b"]} ],
+      //filters: [{ namePrefix: "Benji" }],
+      //filters: [{ services: [serviceUUID] }], // fake service to send raw data as serial
       //filters: [{ name: "HMSoft" }],
 
     })
-    //console.log(btDevice, btDevice.name, btDevice.id, btDevice.gatt.connected)
+    console.log("YO", btDevice, btDevice.name, btDevice.id, btDevice.gatt.connected)
 
     // BTLE
     const server = await btDevice.gatt.connect()
@@ -499,7 +455,7 @@ async function connectToEyes() {
 
     let characteristics = await service.getCharacteristics()
     //console.log(`Characteristics: ${characteristics.map(c => c.uuid).join('\n' + ' '.repeat(19))}`)
-    btCharacteristic = await service.getCharacteristic(serialUUID) //19b10001-e8f2-537e-4f6c-d104768a1214
+    btCharacteristic = await service.getCharacteristic(characteristicUUID) //19b10001-e8f2-537e-4f6c-d104768a1214
 
     // now activate eyes
     eyesActive = true
@@ -545,7 +501,28 @@ async function fetchStats() {
   }
 }
 
-window.addEventListener("load", (event) => {
-    console.log("page loaded - fetch results")
-    fetchStats()
-})
+const sendGameMode = function(mode) {
+  dvCmd.setUint8(0, 1) // cmd 1: change GameMode
+  dvCmd.setUint8(1, mode)
+  dvCmd.setInt32(2, 0, true) // command length 0, little endian
+  ws.send(new Uint8Array(cmdBuf))
+}
+
+const setSnapContext = function(ctx) {
+  ctxSnap = ctx
+}
+
+// Activate BTLE eyes in backend via websockets
+const activateEyes = function() {
+  dvCmd.setUint8(0, 2) // cmd 2: activate BTLE Eyes
+  ws.send(new Uint8Array(cmdBuf))
+}
+
+// Deactivate BTLE eyes in backend via websockets
+const deactivateEyes = function() {
+  dvCmd.setUint8(0, 3) // cmd 3: deactivate BTLE Eyes
+  ws.send(new Uint8Array(cmdBuf))
+}
+
+export { writeToEyes, connectToEyes, sendGameMode, clearData, setSnapContext, activateEyes, deactivateEyes, fetchStats,
+resetButtonBox, buttonLedToggle, buttonLedOff, buttonLedOn, hideOverlay }

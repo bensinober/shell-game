@@ -43,7 +43,76 @@
       <div id="overlayText"></div>
     </div>
   </div>
-  <script type="module" src="assets/script.js"></script>
+  <script type="module" id="main">
+
+    import { writeToEyes, connectToEyes, clearData, sendGameMode, buttonLedOn, hideOverlay } from "./assets/script.js"
+
+    document.addEventListener("DOMContentLoaded", function() {
+
+      // simple countdown timer
+      document.getElementById("startBtn").addEventListener("click", function(evt) {
+        document.getElementById("startBtn").classList.remove("open")
+        showOverlay("snurr i vei!")
+        clearData()
+        duration = 18 // one game = 18 secs
+        slideCnt = 0
+        timerId = setInterval(function (evt) {
+          if(duration <= 0) {
+            // FINISHED
+            clearInterval(timerId)
+            document.querySelector(".countdownTimer").innerHTML = "FERDIG!"
+            setTimeout(() => {
+              document.querySelector(".countdownTimer").innerHTML = ""
+            }, 1000)
+            sendGameMode(2) // GameMode.STOP
+            buttonLedOn(startBtn)
+            document.getElementById("predictBtn").classList.add("open")
+            hideOverlay()
+          } else {
+            document.querySelector(".countdownTimer").innerHTML = "00:" + duration.toString().padStart(2, "0")
+            sendGameMode(3) // GameMode.SNAP
+            if (duration < 4) {
+              let mySound = new Audio("assets/beep-09.wav")
+              mySound.play()
+            }
+          }
+          duration -= 1
+          slideCnt += 1
+        }, 1000)
+      })
+
+      //document.getElementById("eyesBtn").addEventListener("click", function(evt) {
+      //  console.log("EYES")
+      //  popUpOverlay("my eyes see you!")
+      //})
+      document.getElementById("predictBtn").addEventListener("click", function(evt) {
+        console.log("PREDICT")
+        sendGameMode(7) // GameMode.PREDICT
+        document.getElementById("predictBtn").classList.remove("open")
+        document.getElementById("verdictBtn").classList.add("open")
+      })
+
+      document.getElementById("verdictBtn").addEventListener("click", function(evt) {
+        console.log("VERDICT")
+        sendGameMode(8) // GameMode.VERDICT
+        document.getElementById("verdictBtn").classList.remove("open")
+        document.getElementById("startBtn").classList.add("open")
+      })
+
+      document.getElementById("connectBtn").addEventListener("click", async(evt) => {
+        if ("bluetooth" in navigator) {
+          try {
+            await connectToEyes()
+          } catch(err) {
+            console.log(err)
+          }
+        } else {
+          console.log("you need to activate web bluetooth api in browser!")
+        }
+      })
+
+    })
+  </script>
 </body>
 
 </html>
