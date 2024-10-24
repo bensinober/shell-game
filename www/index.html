@@ -30,7 +30,7 @@
           <button id="startBtn" class="arcade-button open">Start</button>
           <button id="predictBtn" class="arcade-button">Gjett</button>
           <button id="verdictBtn" class="arcade-button">Vis</button>
-          <!--<button id="eyesBtn" class="arcade-button">Øyne</button>-->
+          <button id="eyesBtn" class="arcade-button">Øyne</button>
         </div>
         <button id="connectBtn" class="arcade-button">Koble</button>
       </div>
@@ -45,7 +45,7 @@
   </div>
   <script type="module" id="main">
 
-    import { startGame, sendGameMode } from "./assets/script.js"
+    import { startGame, sendGameMode, toggleEyesActive } from "./assets/script.js"
     import { connectToEyes } from "./assets/eyes.js"
     import { connecToButtonBox } from "./assets/gameButtonBox.js"
 
@@ -57,22 +57,23 @@
       document.getElementById("predictBtn").addEventListener("click", function(evt) {
         console.log("PREDICT")
         sendGameMode(7) // GameMode.PREDICT
-        document.getElementById("predictBtn").classList.remove("open")
-        document.getElementById("verdictBtn").classList.add("open")
+        document.getElementById("predictBtn").classList.remove("down")
+        document.getElementById("verdictBtn").classList.add("down")
       })
 
       document.getElementById("verdictBtn").addEventListener("click", function(evt) {
         console.log("VERDICT")
         sendGameMode(8) // GameMode.VERDICT
-        document.getElementById("verdictBtn").classList.remove("open")
-        document.getElementById("startBtn").classList.add("open")
+        document.getElementById("verdictBtn").classList.remove("down")
+        document.getElementById("startBtn").classList.add("down")
       })
 
       document.getElementById("connectBtn").addEventListener("click", function(evt) {
         // connect to button box and eyes
         connecToButtonBox()
-        connectToEyes()
+        connectToEyes() // TODO: handle BTLE in app instead
       })
+      document.getElementById("eyesBtn").addEventListener("click", toggleEyesActive)
 
     })
   </script>

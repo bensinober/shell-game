@@ -119,11 +119,10 @@ body {
   box-shadow: rgba(0, 0, 0, 0.8) 0 0 10px 5px, rgba(0, 0, 0, 0.8) 0 3px 3px inset, #8d0230 0 8px 10px inset, rgba(0, 0, 0, 0.3) 0 20px 10px inset, rgba(255, 255, 255, 0.3) 0 -2px 3px inset, #8d0230 0 -7px 20px inset;
 }
 
-.arcade-button.open {
-  border-color: yellow;
-  background-image: -moz-radial-gradient(40px 40px, circle contain, beige 15px, beige 30px, beige 40px, beige 65px);
-  background-image: -webkit-radial-gradient(40px 40px, circle contain, beige 15px, beige 30px, beige 40px, beige 65px);
-  background-image: radial-gradient(circle contain at 40px 40px, beige 15px, beige 30px, beige 40px, beige 65px);
+.arcade-button.down {
+  background-image: -moz-radial-gradient(40px 40px, circle contain, lightgreen 15px, lightgreen 30px, lightgreen 40px, lightgreen 65px);
+  background-image: -webkit-radial-gradient(40px 40px, circle contain, lightgreen 15px, lightgreen 30px, lightgreen 40px, lightgreen 65px);
+  background-image: radial-gradient(circle contain at 40px 40px, lightgreen 15px, lightgreen 30px, lightgreen 40px, lightgreen 65px);
 }
 
 .arcade-button:before {

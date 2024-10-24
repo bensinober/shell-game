@@ -5,7 +5,7 @@
 
 var btDevice
 var btCharacteristic // the btle char device to send centroids to
-let eyesConnected = false
+var eyesConnected = false
 
 // Write eye command to eyes, check if inside byte range
 async function writeToEyes(x, y) {

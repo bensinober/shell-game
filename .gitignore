@@ -1,5 +1,5 @@
 zig-out
-zig-cache
+.zig-cache
 images/*
 node_modules/*
 shell-game.db*

@@ -1,6 +1,7 @@
 ///////////////////////
 // SHELL GAME JAVASCRIPT
 // Game Globals
+// Game mode is held in browser
 ///////////////////////
 import { connectToEyes, writeToEyes, eyesConnected } from "./eyes.js"
 import { buttonBoxWriter, connecToButtonBox, buttonLedToggle, resetButtonBox, buttonLedOn, buttonLedOff } from "./gameButtonBox.js"
@@ -20,14 +21,24 @@ var slideCnt = 0
 var uuid
 const cmdBuf = new ArrayBuffer(6)
 const dvCmd = new DataView(cmdBuf)
+const eyesBtn = document.querySelector("#eyesBtn")
+var eyesActive = false
+
 //dvCmd.setUint8(0, 1) // command
 //dvCmd.setInt32(2, 0, true) // command length 0, little endian
+
+// Websocket client
+const ws = new WebSocket(`wss://${window.location.host}/ws?channels=shell-game`)
+ws.addEventListener("open", event => ws.binaryType = "arraybuffer")
+ws.addEventListener("message", wsMessageHandler)
 
 const startBtn = document.getElementById("startBtn")
 
 // Keypress either by keyboard or by serial connected shell game box using HID
-document.addEventListener("keypress", (event) => {
-  event.preventDefault()
+document.addEventListener("keypress", keypressFunc)
+
+function keypressFunc(evt) {
+  evt.preventDefault()
   switch (event.key) {
     case "s":
       if (gameMode === GameModes[0] || gameMode === GameModes[4] || gameMode === GameModes[5] || gameMode === GameModes[6]) {
@@ -61,10 +72,10 @@ document.addEventListener("keypress", (event) => {
     default:
       console.log("NOOP")
   }
-})
+}
 
 function startGame() {
-  startBtn.classList.remove("open")
+  startBtn.classList.remove("down")
   showOverlay("snurr i vei!")
   clearData()
   duration = 18 // one game = 18 secs
@@ -79,7 +90,7 @@ function startGame() {
       }, 1000)
       sendGameMode(2) // GameMode.STOP
       buttonLedOn(startBtn)
-      document.getElementById("predictBtn").classList.add("open")
+      document.getElementById("predictBtn").classList.add("down")
       hideOverlay()
     } else {
       document.querySelector(".countdownTimer").innerHTML = "00:" + duration.toString().padStart(2, "0")
@@ -113,15 +124,13 @@ function centroidToLetter(centroid) {
   }
 }
 
-const ws = new WebSocket("wss://localhost:8665/ws?channels=shell-game")
-ws.addEventListener("open", event => ws.binaryType = "arraybuffer")
-ws.addEventListener("message", async event => {
+async function wsMessageHandler(evt) {
   //console.log(`INCOMING: ${event.data}`)
-  const dv = new DataView(event.data);
+  const dv = new DataView(evt.data);
   const cmd = dv.getUint8(0)
   const mode = dv.getUint8(1)
   const len = dv.getInt32(2, true)
-  const data = event.data.slice(6)
+  const data = evt.data.slice(6)
   const slideCanvas = document.getElementById("slideBox")
   const predictCanvas = document.getElementById("predictBox")
   const ctxSlides = slideCanvas.getContext("2d")
@@ -266,7 +275,7 @@ ws.addEventListener("message", async event => {
   default:
     console.log(`unknow CMD: ${cmd}`)
   }
-})
+}
 
 function genUUID() {
   return Math.random().toString(36).slice(-10)
@@ -328,28 +337,6 @@ function popUpOverlay(text) {
     }, 3000)
 }
 
-////////////////////
-// WEB Bluetooth API
-// emulates a serial port
-////////////////////
-
-/*
-const sendCentBtn = document.getElementById("sendCentBtn")
-document.getElementById("sendCentBtn").addEventListener("click", async function(evt) {
-  const div = document.querySelector(".centroid")
-  const xy = div.innerText.split(",")
-  const x = parseInt(xy[0], 10)
-  const y = parseInt(xy[1], 10)
-  writeToEyes(x, y)
-})
-*/
-
-var btDevice
-var btCharacteristic // the btle char device to send centroids to
-
-
-
-
 function addScore() {
   if (predictLetter === verdictLetter) {
     machineScore += 1
@@ -393,16 +380,18 @@ const setSnapContext = function(ctx) {
   ctxSnap = ctx
 }
 
-// Activate BTLE eyes in backend via websockets
-const activateEyes = function() {
-  dvCmd.setUint8(0, 2) // cmd 2: activate BTLE Eyes
-  ws.send(new Uint8Array(cmdBuf))
+function toggleEyesActive() {
+  if (eyesActive === false) {
+    dvCmd.setUint8(0, 2) // cmd 2: activate BTLE Eyes
+    ws.send(new Uint8Array(cmdBuf))
+    eyesBtn.classList.add("down")
+    eyesActive = true
+  } else {
+    dvCmd.setUint8(0, 3) // cmd 3: deactivate BTLE Eyes
+    ws.send(new Uint8Array(cmdBuf))
+    eyesBtn.classList.remove("down")
+    eyesActive = false
+  }
 }
 
-// Deactivate BTLE eyes in backend via websockets
-const deactivateEyes = function() {
-  dvCmd.setUint8(0, 3) // cmd 3: deactivate BTLE Eyes
-  ws.send(new Uint8Array(cmdBuf))
-}
-
-export { startGame, sendGameMode, clearData, setSnapContext, activateEyes, deactivateEyes, fetchStats, hideOverlay }
+export { startGame, sendGameMode, clearData, setSnapContext, toggleEyesActive, fetchStats, hideOverlay }
