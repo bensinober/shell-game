@@ -225,6 +225,34 @@ const Tracker = struct {
         };
     }
 
+    // sending directly to animatronic eyes
+    // we need to map input vector x,y (640, 480) to u8 bytes (255, 255)
+    // send as 5 u8 bytes { 0, 2, x, y, CRLF }, not expecting any response
+    fn sendCentroidToEyes(_: Self, p: cv.core.Point) !void {
+        if (btConnected == false) {
+            return;
+        }
+        const t = std.time.milliTimestamp();
+        if (@mod(t, 2) != 0) {
+            return; // only send 1/5 of signals not to choke BTLE peripheral
+        }
+        // x, y is only two u8 bytes + 0, 2
+        const x1: f32 = @floatFromInt(p.x);
+        const y1: f32 = @floatFromInt(p.y);
+        const x2: f32 = std.math.round(x1 / 640.0 * 255.0); // map 0-640 to 0-255
+        const y2: f32 = std.math.round(@abs(640.0 - y1) / 640.0 * 255.0); // map to 0-255 and invert
+        std.debug.print("Sending x, y: ({d}, {d}) mapped: ({d:.0}, {d:.0}) to eyes\n", .{ p.x, p.y, x2, y2 });
+        const xByte: u8 = @truncate(@as(u32, @bitCast(@as(i32, @intFromFloat(x2)))));
+        const yByte: u8 = @truncate(@as(u32, @bitCast(@as(i32, @intFromFloat(y2)))));
+        var cmd: [5]u8 = .{ 0, 2, xByte, yByte, 13 };
+        //std.debug.print("Sending x, y: ({d}, {d}) to eyes: {any} \n", .{x2, y2, cmd});
+        const cmd_c: [*c]const u8 = @ptrCast(&cmd);
+        const err_code = ble.simpleble_peripheral_write_request(btPeripheral, btService.uuid, btService.characteristics[btCharId].uuid, cmd_c, 5);
+        if (err_code != @as(c_uint, @bitCast(ble.SIMPLEBLE_SUCCESS))) {
+            std.debug.print("Failed to send data to eyes.\n", .{});
+        }
+    }
+
     // centroid is x,y i32
     fn sendCentroid(_: Self, p: cv.core.Point) !void {
         var buf = [_]u8{0} ** 14;
@@ -261,11 +289,11 @@ const Tracker = struct {
 
         // 1) no objects found? we increase disappeared for all until maxLife reached
         if (results.items.len == 0) {
-            std.debug.print("TRACKER: no input vs {d} tracked.\n", .{self.objects.items.len});
+            //std.debug.print("TRACKER: no input vs {d} tracked.\n", .{self.objects.items.len});
             for (self.objects.items, 0..) |*obj, idx| {
                 obj.increaseDisapperance();
                 if (obj.disappeared > self.maxLife) {
-                    std.debug.print("TRACKER LOST ALL: unregistering item {d}\n", .{idx});
+                    // std.debug.print("TRACKER LOST ALL: unregistering item {d}\n", .{idx});
                     try self.unregister(idx);
                 }
             }
@@ -274,7 +302,7 @@ const Tracker = struct {
 
         // 2) objects found, but not tracking any? register each as new
         if (self.objects.items.len == 0) {
-            std.debug.print("TRACKER: no existing objects. Adding {d} new\n", .{results.items.len});
+            // std.debug.print("TRACKER: no existing objects. Adding {d} new\n", .{results.items.len});
             for (results.items) |res| {
                 try self.register(res);
             }
@@ -467,7 +495,7 @@ const Tracker = struct {
 // float y_factor = modelInput.rows / modelShape.height;
 fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tracker, allocator: Allocator) !void {
     //try cv.imWrite("object.jpg", img.*);
-    std.debug.print("scoreMat size: {any}\n", .{scoreMat.size()});
+    //std.debug.print("scoreMat size: {any}\n", .{scoreMat.size()});
 
     // factor is model input / model shape
     // float x_factor = modelInput.cols / modelShape.width;
@@ -562,7 +590,7 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
     for (tracker.objects.items) |obj| {
         if (obj.classId == 1) { // class 1: a ball! we return focus
             tracker.focusId = obj.id;
-            tracker.lastFocusObj = obj;
+            //tracker.lastFocusObj = obj;
             cv.arrowedLine(img, cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 50), cv.Point.init(obj.box.x + @divFloor(obj.box.width, 2), obj.box.y - 30), green, 4);
         }
         var buf = [_]u8{undefined} ** 40;
@@ -605,7 +633,16 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
     switch (gameMode) {
         .IDLE, .TRACK_BALL, .TRACK_HIDDEN, .TRACK_IDLE, .STOP=> {
             if (focusObj) |obj| {
-                try tracker.sendCentroid(obj.centre);
+                if (tracker.lastFocusObj) |lastObj| {
+                    // dont send centroid if not changed
+                    if (!std.meta.eql(obj.centre, lastObj.centre)) {
+                        try tracker.sendCentroid(obj.centre);
+                        try tracker.sendCentroidToEyes(obj.centre);
+                    }
+                } else {
+                    try tracker.sendCentroid(obj.centre);
+                    try tracker.sendCentroidToEyes(obj.centre);
+                }
             }
         },
         .SNAP => {
@@ -651,6 +688,9 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
                 std.debug.print("Centroid: {any}\n", .{obj.centre});
             }
         },
+    }
+    if (focusObj) |obj| {
+        tracker.lastFocusObj = obj;
     }
 }
 
@@ -783,7 +823,6 @@ pub fn main() anyerror!void {
     defer arena.deinit();
     const allocator = arena.allocator();
     var args = try std.process.argsWithAllocator(allocator);
-
     const prog = args.next();
     const deviceIdChar = args.next() orelse {
         std.log.err("usage: {s} [cameraID] [model]", .{prog.?});
@@ -794,6 +833,9 @@ pub fn main() anyerror!void {
         std.process.exit(1);
     };
     args.deinit();
+
+    // make sure BTLE is released on exit
+    defer disconnectBluetooth();
 
     const deviceId = try std.fmt.parseUnsigned(i32, deviceIdChar, 10);
     _ = try std.fmt.parseUnsigned(i32, deviceIdChar, 10);
@@ -940,7 +982,7 @@ pub fn main() anyerror!void {
         // transform image to CV matrix / 4D blob
         var blob = try cv.Blob.initFromImage(img, scale, size, mean, swapRB, crop);
         defer blob.deinit();
-        std.debug.print("input blob size {any}\n", .{blob.mat.size()});
+        //std.debug.print("input blob size {any}\n", .{blob.mat.size()});
 
         // YOLOv8 INFERENCE
         // yolov8 has an output of shape (batchSize, 84,  8400) (Num classes + box[x,y,w,h])
@@ -950,16 +992,16 @@ pub fn main() anyerror!void {
         net.setInput(blob, "");
         var probs = try net.forward("output0");
         defer probs.deinit();
-        std.debug.print("orig probMat size {any},\n", .{probs.size()});
+        //std.debug.print("orig probMat size {any},\n", .{probs.size()});
         const rows: usize = @intCast(probs.size()[2]);
         const dims: usize = @intCast(probs.size()[1]);
         var probMat = try probs.reshape(1, dims);
-        std.debug.print("reshaped probMat size {any},\n", .{probMat.size()});
+        //std.debug.print("reshaped probMat size {any},\n", .{probMat.size()});
         defer probMat.deinit();
         cv.Mat.transpose(probMat, &probMat);
         //var transposeVector = [_]i32{0, 2, 1};
         //cv.Mat.transposeND(probs, &transposeVector, &probs);
-        std.debug.print("transposed probmat size {any}\n", .{probMat.size()});
+        //std.debug.print("transposed probmat size {any}\n", .{probMat.size()});
         try performDetection(&img, probMat, rows, size, &tracker, allocator);
 
         window.imShow(img);
