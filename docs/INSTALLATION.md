@@ -242,31 +242,24 @@ sudo make install
 sudo ldconfig
 ```
 
+## Add opencv development libraries to zig
+
+As of zig 0.13, absolute paths are no longer supported for includes, so we need to symlink in headers:
+
+    ln -s /usr/local/include/opencv4 include/opencv4
+
+
 ## Bluetooth
 
+    sudo apt install libdbus-1-dev libfmt-dev g++
 
-Bleno - for handling bluetooth BLE in backend (NOT USED - we use Web bluetooth API instead)
     sudo apt-get install libbluetooth-dev
 
-    bun add bleno@npm:@abandonware/bleno
+Prepare (make export.h)
 
-# if missing permissions for nodejs to advertise ble
-
-    (sudo setcap cap_net_raw+eip $(eval readlink -f `which node`))
-
-Device A4:06:E9:8E:00:0A HMSoft
-Device 98:D3:C1:FD:B3:95 HC-05
-
-pair animatronics device to be controlled
-Linux: pair and connect with bluetoothctl
-
-  $ bluetoothctl
-  power on
-  scan on
-  trust <macaddr>
-  pair <macaddr>
-    enter PIN
-
-you should now have /dev/rfcomm0
-
-test with `screen /dev/rfcomm0 9600`
+    git clone https://github.com/OpenBluetoothToolbox/SimpleBLE
+    cd SimpleBLE/simpleble
+    cmake -B build_simpleble -DBUILD_SHARED_LIBS=TRUE .
+    cd build_simpleble && make -j6
+    sudo make install
+    sudo ldconfig

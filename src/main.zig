@@ -1,6 +1,7 @@
 const std = @import("std");
 const cv = @import("zigcv");
 const websocket = @import("websocket");
+const ble = @import("simpleble.zig"); // animatronic eyes controlled over bluetooth
 
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
