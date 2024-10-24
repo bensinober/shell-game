@@ -10,11 +10,20 @@ const Size = cv.Size;
 
 // *** GLOBALS ***
 pub const io_mode = .evented;
+
 // shell game
 var CLASSES = [_][]const u8{ "red_cup", "green_disc" };
 
 const green = cv.Color{ .g = 255 };
 const red = cv.Color{ .r = 255 };
+
+// Bluetooth eyes // micro:bit
+var btConnected: bool = false;
+const btPeriphStr: []const u8 = "FB:C9:6D:CB:9D:63";
+const btServiceUuidStr: []const u8 = "e2e00001-15cf-4074-9331-6fac42a4920b";
+const btCharId: usize = 1; // choose second characteristic, as it is writable
+var btPeripheral: ble.simpleble_peripheral_t = undefined;
+var btService: ble.simpleble_service_t = undefined; //.{ .value = microbitUartServicePtr };
 
 // GameMode is modified by timer and external Socket commands
 pub const GameMode = enum(u8) {
@@ -52,15 +61,20 @@ const MsgHandler = struct {
     // Handle Commands via websocket
     pub fn handle(self: MsgHandler, msg: websocket.Message) !void {
         std.log.debug("got msg: {any}", .{msg.data});
-        if (msg.data[0] == 1) {
+        const cmd = msg.data[0];
+        if (cmd == 1) {
             const mode: GameMode = @enumFromInt(msg.data[1]);
             lastGameMode = gameMode;
             gameMode = mode;
             const mb: u8 = std.mem.asBytes(&gameMode)[0];
-            std.log.debug("switched mode from: {any} to {any}", .{lastGameMode, gameMode});
+            std.log.debug("switched mode from: {any} to {any}", .{ lastGameMode, gameMode });
             const res = try self.allocator.alloc(u8, 8);
-            @memcpy(res, &[_]u8{0, mb, 2, 0, 0, 0, 0x4f, 0x4b}); // OK
+            @memcpy(res, &[_]u8{ 0, mb, 2, 0, 0, 0, 0x4f, 0x4b }); // OK
             _ = try wsClient.writeBin(res);
+        } else if (cmd == 2) {
+            connectBluetooth();
+        } else if (cmd == 3) {
+            disconnectBluetooth();
         } else {
             const res = try self.allocator.alloc(u8, 9);
             const mb: u8 = std.mem.asBytes(&gameMode)[0];
@@ -68,8 +82,7 @@ const MsgHandler = struct {
             _ = try wsClient.write(res);
         }
     }
-    pub fn close(_: MsgHandler) void {
-    }
+    pub fn close(_: MsgHandler) void {}
 };
 
 // Result is a rect object containing scores and a class
@@ -293,14 +306,9 @@ const Tracker = struct {
 
             for (self.objects.items, 0..) |obj, objIdx| {
                 const objCent = obj.centre;
-                // TODO: is this memory safe?
                 var diffs = try allocator.alloc(f32, results.items.len);
                 for (results.items, 0..) |res, resIdx| {
-                    const resCent = res.centre;
-                    const xDiff: f32 = @floatFromInt(resCent.x - objCent.x);
-                    const yDiff: f32 = @floatFromInt(resCent.y - objCent.y);
-                    const diff: f32 = std.math.sqrt((xDiff * xDiff) + (yDiff * yDiff));
-                    diffs[resIdx] = diff;
+                    diffs[resIdx] = euclidDist(res.centre, objCent);
                 }
                 mat[objIdx] = diffs;
             }
@@ -644,6 +652,114 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
             }
         },
     }
+}
+
+pub fn connectBluetooth() void {
+    std.debug.print("Connecting to bluetooth.\n", .{});
+    if (btConnected == true) {
+        return; // already connected
+    }
+    const adapter_count: usize = ble.simpleble_adapter_get_count();
+    if (adapter_count == @as(usize, @bitCast(@as(c_long, @as(c_int, 0))))) {
+        std.debug.print("No adapter was found.\n", .{});
+        return;
+    }
+    const adapter: ble.simpleble_adapter_t = ble.simpleble_adapter_get_handle(@as(usize, @bitCast(@as(c_long, @as(c_int, 0)))));
+    if (adapter == @as(?*anyopaque, @ptrFromInt(@as(c_int, 0)))) {
+        std.debug.print("No adapter was found.\n", .{});
+        return;
+    }
+
+    _ = ble.simpleble_adapter_set_callback_on_scan_start(adapter, &ble.adapter_on_scan_start, @as(?*anyopaque, @ptrFromInt(@as(c_int, 0))));
+    _ = ble.simpleble_adapter_set_callback_on_scan_stop(adapter, &ble.adapter_on_scan_stop, @as(?*anyopaque, @ptrFromInt(@as(c_int, 0))));
+    _ = ble.simpleble_adapter_set_callback_on_scan_found(adapter, &ble.adapter_on_scan_found, @as(?*anyopaque, @ptrFromInt(@as(c_int, 0))));
+    _ = ble.simpleble_adapter_scan_for(adapter, @as(c_int, 3000));
+
+    var selection: usize = undefined;
+    var found: bool = false;
+        var i: usize = 0;
+        while (i < ble.peripheral_list_len) : (i +%= 1) {
+            const peripheral: ble.simpleble_peripheral_t = ble.peripheral_list[i];
+            //var peripheral_identifier: [*c]u8 = ble.simpleble_peripheral_identifier(peripheral);
+            const peripheral_address: [*c]u8 = ble.simpleble_peripheral_address(peripheral);
+            const periphStr = std.mem.span(@as([*:0]u8, @ptrCast(@alignCast(peripheral_address))));
+            std.debug.print("comp peripheral: {s} vs {s}\n", .{ periphStr, btPeriphStr });
+            if (std.mem.eql(u8, periphStr, btPeriphStr)) {
+                std.debug.print("found peripheral: {s} id: {any}\n", .{ btPeriphStr, selection });
+                selection = i;
+                found = true;
+                break;
+            }
+        }
+    if (!found) {
+        std.debug.print("Could not find peripheral with mac: {s}\n", .{btPeriphStr});
+        return;
+    }
+
+    std.debug.print("Selected: {d}\n", .{selection});
+    if ((selection < @as(c_int, 0)) or (selection >= @as(c_int, @bitCast(@as(c_uint, @truncate(ble.peripheral_list_len)))))) {
+        std.debug.print("Invalid bluetooth selection\n", .{});
+        return;
+    }
+    btPeripheral = ble.peripheral_list[@as(c_uint, @intCast(selection))];
+    const peripheral_identifier: [*c]u8 = ble.simpleble_peripheral_identifier(btPeripheral);
+    const peripheral_address: [*c]u8 = ble.simpleble_peripheral_address(btPeripheral);
+    std.debug.print("Connecting to {s} [{s}]\n", .{ peripheral_identifier, peripheral_address });
+    ble.simpleble_free(@as(?*anyopaque, @ptrCast(peripheral_identifier)));
+    ble.simpleble_free(@as(?*anyopaque, @ptrCast(peripheral_address)));
+    var err_code = ble.simpleble_peripheral_connect(btPeripheral);
+    if (err_code != @as(c_uint, @bitCast(ble.SIMPLEBLE_SUCCESS))) {
+        std.debug.print("Failed to connect to bluetooth peripheral\n", .{});
+        ble.clean_on_exit(adapter);
+        return;
+    }
+
+    // Service
+    const services_count: usize = ble.simpleble_peripheral_services_count(btPeripheral);
+        var s: usize = 0;
+        while (s < services_count) : (s +%= 1) {
+            var service: ble.simpleble_service_t = undefined;
+            err_code = ble.simpleble_peripheral_services_get(btPeripheral, s, &service);
+            if (err_code != @as(c_uint, @bitCast(ble.SIMPLEBLE_SUCCESS))) {
+                std.debug.print("Invalid bluetooth service selection\n", .{});
+                ble.clean_on_exit(adapter);
+                return;
+            }
+
+            // Select HMSoft Serial service
+            var serviceStr: []const u8 = @ptrCast(@alignCast(&service.uuid.value));
+            std.debug.print("comp service uuid: {s} vs {s}\n", .{ serviceStr, btServiceUuidStr });
+            if (std.mem.eql(u8, serviceStr[0..36], btServiceUuidStr[0..36])) {
+                std.debug.print("found right UART service: {s}\n", .{btServiceUuidStr});
+                btService = service;
+                btConnected = true;
+                break;
+            }
+        }
+    return;
+}
+
+pub fn disconnectBluetooth() void {
+    const errUnpair = ble.simpleble_peripheral_unpair(btPeripheral);
+    if (errUnpair != @as(c_uint, @bitCast(ble.SIMPLEBLE_SUCCESS))) {
+        std.debug.print("Failed to disconnect to bluetooth peripheral\n", .{});
+    }
+    const errDisconect = ble.simpleble_peripheral_disconnect(btPeripheral);
+    if (errDisconect != @as(c_uint, @bitCast(ble.SIMPLEBLE_SUCCESS))) {
+        std.debug.print("Failed to disconnect to bluetooth peripheral\n", .{});
+    }
+    std.debug.print("Disconnected bluetooth peripheral: {any}\n", .{btPeripheral});
+    btPeripheral = undefined;
+    btConnected = false;
+    return;
+}
+
+// calculate Euclidean distance between two points
+fn euclidDist(prev: cv.Point, new: cv.Point) f32 {
+    const xDiff: f32 = @floatFromInt(prev.x - new.x);
+    const yDiff: f32 = @floatFromInt(prev.y - new.y);
+    const diff: f32 = std.math.sqrt((xDiff * xDiff) + (yDiff * yDiff));
+    return diff;
 }
 
 // UNUSED: methods to colorize / focus a bounding box
