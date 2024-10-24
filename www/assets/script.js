@@ -3,9 +3,9 @@
 // Game Globals
 ///////////////////////
 import { connectToEyes, writeToEyes, eyesConnected } from "./eyes.js"
+import { buttonBoxWriter, connecToButtonBox, buttonLedToggle, resetButtonBox, buttonLedOn, buttonLedOff } from "./gameButtonBox.js"
 
 const GameModes = ["IDLE","START","STOP","SNAP","TRACK_BALL","TRACK_HIDDEN","TRACK_IDLE","PREDICT","VERDICT"]
-var eyesActive = false
 var gameMode = GameModes[0]
 var imgPos = [-150, 0] // don't know why we need to start negative offset, but hey, javascript
 var centroid = {x: 320, y: 240}
@@ -23,61 +23,7 @@ const dvCmd = new DataView(cmdBuf)
 //dvCmd.setUint8(0, 1) // command
 //dvCmd.setInt32(2, 0, true) // command length 0, little endian
 
-///////////////////////////////////
-// INPUT FROM SHELL GAME BUTTON BOX
-///////////////////////////////////
-
-var buttonBoxWriter
-const startBtn = 115
-const gameABtn = 97
-const gameBBtn = 98
-const gameCBtn = 99
-/*
-if ("serial" in navigator) {
-  navigator.serial.addEventListener("connect", async (event) => {
-    const port = event.target
-    console.log("connected port")
-    await port.open({ baudRate: 9600 })
-    buttonBoxWriter = port.writable.getWriter()
-    resetGame()
-  })
-
-  navigator.serial.addEventListener("disconnect", async (event) => {
-    const port = event.target
-    console.log("disconnected serialport")
-  })
-}
-*/
-// user action needed to use web serial or web bluetooth, so we trigger by connect button
-document.getElementById("connectBtn").addEventListener("click", async(evt) => {
-  // connect to shell game box
-  if ("serial" in navigator) {
-    try {
-      const filters = [{ usbVendorId: 0x16c0, usbProductId: 0x0487 }]
-      const port = await navigator.serial.requestPort({ filters })
-      await port.open({ baudRate: 9600 })
-      buttonBoxWriter = port.writable.getWriter()
-      resetGame()
-    } catch(err) {
-      console.log(err)
-    }
-  } else {
-    console.log("you need to activate web serial in browser!")
-  }
-  // connect to eyes
-  if ("bluetooth" in navigator) {
-    try {
-      //Device A4:06:E9:8E:00:0A HMSoft
-      // HMSoft uU8ptu87vOOkd/NIwmqtDg== false
-      //console.log("here")
-      await connectToEyes()
-    } catch(err) {
-      console.log(err)
-    }
-  } else {
-    console.log("you need to activate web bluetooth api in browser!")
-  }
-})
+const startBtn = document.getElementById("startBtn")
 
 // Keypress either by keyboard or by serial connected shell game box using HID
 document.addEventListener("keypress", (event) => {
@@ -117,46 +63,36 @@ document.addEventListener("keypress", (event) => {
   }
 })
 
-// toggle key led
-async function buttonLedToggle(key) {
-  console.log("LED TOGGLE", key)
-  if (buttonBoxWriter) {
-    const data = new Uint8Array([key])
-    await buttonBoxWriter.write(data)
-    //buttonBoxWriter.releaseLock()
-  }
-}
-
-// (key - 10) => led off
-async function buttonLedOff(key) {
-  console.log("LED OFF", key)
-  if (buttonBoxWriter) {
-    const data = new Uint8Array([key - 10])
-    await buttonBoxWriter.write(data)
-    //buttonBoxWriter.releaseLock()
-  }
-}
-
-// (key + 10) => led on
-async function buttonLedOn(key) {
-  console.log("LED ON", key)
-  if (buttonBoxWriter) {
-    const data = new Uint8Array([key + 10])
-    await buttonBoxWriter.write(data)
-    //buttonBoxWriter.releaseLock()
-  }
-}
-
-function resetButtonBox() {
-  console.log("RESET BUTTON BOX")
-  if (buttonBoxWriter) {
-    for (const b of [gameABtn, gameBBtn, gameCBtn]) {
-      buttonLedOff(b)
+function startGame() {
+  startBtn.classList.remove("open")
+  showOverlay("snurr i vei!")
+  clearData()
+  duration = 18 // one game = 18 secs
+  slideCnt = 0
+  timerId = setInterval(function (evt) {
+    if(duration <= 0) {
+      // FINISHED
+      clearInterval(timerId)
+      document.querySelector(".countdownTimer").innerHTML = "FERDIG!"
+      setTimeout(() => {
+        document.querySelector(".countdownTimer").innerHTML = ""
+      }, 1000)
+      sendGameMode(2) // GameMode.STOP
+      buttonLedOn(startBtn)
+      document.getElementById("predictBtn").classList.add("open")
+      hideOverlay()
+    } else {
+      document.querySelector(".countdownTimer").innerHTML = "00:" + duration.toString().padStart(2, "0")
+      sendGameMode(3) // GameMode.SNAP
+      if (duration < 4) {
+        let mySound = new Audio("assets/beep-09.wav")
+        mySound.play()
+      }
     }
-    buttonLedOn(startBtn)
-  }
+    duration -= 1
+    slideCnt += 1
+  }, 1000)
 }
-
 function resetGame() {
   resetButtonBox()
   dvCmd.setUint8(1, 0) // GameMode.IDLE
@@ -209,7 +145,7 @@ ws.addEventListener("message", async event => {
     centroid = {x, y}
     const div = document.querySelector(".centroid")
     div.innerHTML = `${x},${y}`
-    if (eyesActive) {
+    if (eyesConnected) {
       writeToEyes(x, y)
     }
     break
@@ -469,5 +405,4 @@ const deactivateEyes = function() {
   ws.send(new Uint8Array(cmdBuf))
 }
 
-export { sendGameMode, clearData, setSnapContext, activateEyes, deactivateEyes, fetchStats,
-resetButtonBox, buttonLedToggle, buttonLedOff, buttonLedOn, hideOverlay }
+export { startGame, sendGameMode, clearData, setSnapContext, activateEyes, deactivateEyes, fetchStats, hideOverlay }
