@@ -44,9 +44,11 @@ body {
 .scores {
   display: grid; grid-template-columns: 50% 50%; font-family: 'Blade Runner Movie Font', sans-serif; font-size: 48px; text-align: left;
 }
-
+.predictions {
+  font-family: 'Blade Runner Movie Font', sans-serif; font-size: 24px; text-align: left;
+}
 .scores .col {
-  padding: 1em;
+  padding: .5em;
 }
 
 .hidden{

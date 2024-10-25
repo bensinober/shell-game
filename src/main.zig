@@ -42,6 +42,7 @@ pub const GameMode = enum(u8) {
     TRACK_IDLE,
     PREDICT,
     VERDICT,
+    STATS,
     _,
 
     // Probably no longer neccessary
@@ -64,7 +65,10 @@ var wsClient: websocket.Client = undefined;     // Websocket client
 const MsgHandler = struct {
     allocator: Allocator,
 
-    // Handle Commands via websocket
+    // Handle Commands via websockets
+    // 1. change Game Mode
+    // 2. enable bluetooth
+    // 3. disable bluetooth
     pub fn handle(self: MsgHandler, msg: websocket.Message) !void {
         std.log.debug("got msg: {any}", .{msg.data});
         const cmd = msg.data[0];
@@ -82,10 +86,10 @@ const MsgHandler = struct {
         } else if (cmd == 3) {
             disconnectBluetooth();
         } else {
-            const res = try self.allocator.alloc(u8, 9);
+            const res = try self.allocator.alloc(u8, 8);
             const mb: u8 = std.mem.asBytes(&gameMode)[0];
-            @memcpy(res, &[_]u8{0, mb, 2, 0, 0, 0, 0x4e, 0x4f, 0x4b}); // NOK
-            _ = try wsClient.write(res);
+            @memcpy(res, &[_]u8{0, mb, 2, 0, 0, 0, 0x4b, 0x4f}); // KO
+            _ = try wsClient.writeBin(res);
         }
     }
     pub fn close(_: MsgHandler) void {}
@@ -622,12 +626,13 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
         tracker.fps = tracker.frames / secs;
         tracker.frames = 0;
     }
-    var fpsBuf = [_]u8{undefined} ** 20;
-    const fpsTxt = try std.fmt.bufPrint(&fpsBuf, "FPS ({d:.2})", .{ tracker.fps });
-    cv.putText(img, fpsTxt, cv.Point.init(10,30), cv.HersheyFont{ .type = .simplex }, 0.5, green, 2);
-    var modeBuf = [_]u8{undefined} ** 14;
-    const modeTxt = try std.fmt.bufPrint(&modeBuf, "{s}", .{ @tagName(gameMode) });
-    cv.putText(img, modeTxt, cv.Point.init(10,620), cv.HersheyFont{ .type = .simplex }, 0.5, green, 2);
+
+    var buf = [_]u8{undefined} ** 20; // common buf for outputting cv labels to img
+    const fpsTxt = try std.fmt.bufPrint(&buf, "FPS ({d:.2})", .{tracker.fps});
+    cv.putText(img, fpsTxt, cv.Point.init(10, 30), cv.HersheyFont{ .type = .simplex }, 0.5, green, 2);
+    @memset(&buf, 0);
+    const modeTxt = try std.fmt.bufPrint(&buf, "{s}", .{@tagName(gameMode)});
+    cv.putText(img, modeTxt, cv.Point.init(10, 60), cv.HersheyFont{ .type = .simplex }, 0.5, green, 2);
 
     const focusObj = tracker.getFocusObj();
     // TODO: is this neccessary? we should always have a focus object
@@ -637,7 +642,7 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
 
     // Now see if we have pending modes
     switch (gameMode) {
-        .IDLE, .TRACK_BALL, .TRACK_HIDDEN, .TRACK_IDLE, .STOP=> {
+        .IDLE, .TRACK_BALL, .TRACK_HIDDEN, .TRACK_IDLE, .STOP => {
             if (focusObj) |obj| {
                 if (tracker.lastFocusObj) |lastObj| {
                     // dont send centroid if not changed
@@ -669,7 +674,8 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
 
             //img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
             try tracker.sendImage(img);
-            gameMode = lastGameMode;
+            lastGameMode = gameMode;
+            gameMode = GameMode.STOP;
         },
         .VERDICT => {
             if (focusObj) |obj| {
@@ -686,6 +692,7 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
                 try tracker.sendStats(obj);
             }
             tracker.clearOverlay();
+            lastGameMode = gameMode;
             gameMode = GameMode.STOP;
         },
         else => {

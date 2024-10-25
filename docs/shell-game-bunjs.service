@@ -1,13 +1,13 @@
-#robot-eyes-bunjs.service
+#shell-game-bunjs.service
 [Unit]
 Description=Start shell-game bun server
 
 [Service]
-WorkingDirectory=/home/plasma/shell-game
-User=plasma
-Group=plasma
+WorkingDirectory=/home/bjorvika/shell-game
+User=bjorvika
+Group=bjorvika
 Restart=always
-ExecStart=/home/plasma/.bun/bin/bun run server.js
+ExecStart=/home/bjorvika/.bun/bin/bun run server.js
 
 [Install]
 WantedBy=multi-user.target

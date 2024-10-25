@@ -19,20 +19,25 @@
           <div class="col">maskin:</div><div class="col" id="machineScore">0</div>
           <div class="col">menneske:</div><div class="col" id="humanScore">0</div>
         </div>
+        <div class="predictions">
+          <div class="col">anslag fra video: <span id="eyePrediction"></span></div>
+          <div class="col">anslag fra modell: <span id="modelPrediction"></span></div>
+          <div class="col">bestemt av bruker: <span id="userVerdict"></span></div>
+        </div>
       </div>
       <div class="quarter" id="NE">
         <canvas id="slideBox" width="950" height="450"></canvas>
       </div>
       <div class="quarter" id="SE">
-        <div id="gameMode"></div>
         <div class="centroid">150,150</div>
         <div class="buttons">
           <button id="startBtn" class="arcade-button open">Start</button>
           <button id="predictBtn" class="arcade-button">Gjett</button>
           <button id="verdictBtn" class="arcade-button">Vis</button>
           <button id="eyesBtn" class="arcade-button">Øyne</button>
+          <button id="connectBtn" class="arcade-button">Boks</button>
         </div>
-        <button id="connectBtn" class="arcade-button">Koble</button>
+        <div id="gameMode"></div>
       </div>
       <div class="quarter" id="SW">
         <canvas id="predictBox" width="900" height="450"></canvas>

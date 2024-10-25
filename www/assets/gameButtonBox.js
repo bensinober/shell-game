@@ -6,10 +6,10 @@ import { resetGame } from "./script.js"
 ///////////////////////////////////
 
 var buttonBoxWriter
-const startBtn = 115
-const gameABtn = 97
-const gameBBtn = 98
-const gameCBtn = 99
+const startBtnCode = 115
+const gameABtnCode = 97
+const gameBBtnCode = 98
+const gameCBtnCode = 99
 
 // connect to shell game button box
 async function connecToButtonBox(evt) {
@@ -61,11 +61,11 @@ async function buttonLedOn(key) {
 function resetButtonBox() {
   //console.log("RESET BUTTON BOX")
   if (buttonBoxWriter) {
-    for (const b of [gameABtn, gameBBtn, gameCBtn]) {
+    for (const b of [gameABtnCode, gameBBtnCode, gameCBtnCode]) {
       buttonLedOff(b)
     }
-    buttonLedOn(startBtn)
+    buttonLedOn(startBtnCode)
   }
 }
 
-export { buttonBoxWriter, connecToButtonBox, buttonLedToggle, resetButtonBox, buttonLedOn, buttonLedOff }
+export { buttonBoxWriter, connecToButtonBox, buttonLedToggle, resetButtonBox, buttonLedOn, buttonLedOff, startBtnCode, gameABtnCode, gameBBtnCode, gameCBtnCode }

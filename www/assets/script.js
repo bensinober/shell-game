@@ -2,12 +2,19 @@
 // SHELL GAME JAVASCRIPT
 // Game Globals
 // Game mode is held in browser
+// Game Sequence :
+// 0: idle
+// 1: spin
+// 2: guess
+// 3: tell
 ///////////////////////
 import { connectToEyes, writeToEyes, eyesConnected } from "./eyes.js"
-import { buttonBoxWriter, connecToButtonBox, buttonLedToggle, resetButtonBox, buttonLedOn, buttonLedOff } from "./gameButtonBox.js"
+import { buttonBoxWriter, connecToButtonBox, buttonLedToggle, resetButtonBox, buttonLedOn, buttonLedOff, startBtnCode } from "./gameButtonBox.js"
 
-const GameModes = ["IDLE","START","STOP","SNAP","TRACK_BALL","TRACK_HIDDEN","TRACK_IDLE","PREDICT","VERDICT"]
+const GameModes = ["IDLE","START","STOP","SNAP","TRACK_BALL","TRACK_HIDDEN","TRACK_IDLE","PREDICT","VERDICT", "STATS"]
+const GameStates = ["IDLE","SPIN","GUESS","TELL", "KNOW"]
 var gameMode = GameModes[0]
+var prevMode = GameModes[0]
 var imgPos = [-150, 0] // don't know why we need to start negative offset, but hey, javascript
 var centroid = {x: 320, y: 240}
 var machineScore = 0
@@ -15,6 +22,7 @@ var humanScore = 0
 var predictLetter = ""
 var verdictLetter = ""
 var predictSeq = ""
+var gameState = 0
 var timerId
 var duration
 var slideCnt = 0
@@ -22,6 +30,8 @@ var uuid
 const cmdBuf = new ArrayBuffer(6)
 const dvCmd = new DataView(cmdBuf)
 const eyesBtn = document.querySelector("#eyesBtn")
+const eyePredictionDiv = document.querySelector("#eyePrediction")
+const modelPredictionDiv = document.querySelector("#modelPrediction")
 var eyesActive = false
 
 //dvCmd.setUint8(0, 1) // command
@@ -39,23 +49,21 @@ document.addEventListener("keypress", keypressFunc)
 
 function keypressFunc(evt) {
   evt.preventDefault()
-  switch (event.key) {
+  console.log(evt)
+  switch (evt.key) {
     case "s":
-      if (gameMode === GameModes[0] || gameMode === GameModes[4] || gameMode === GameModes[5] || gameMode === GameModes[6]) {
+      if (gameState === 0) {
         document.getElementById("startBtn").click()
-        buttonLedOff(startBtn) // s
-      } else if (gameMode === GameModes[2]) { // GameMode.STOP
-        if (predictLetter === "") {
-          document.getElementById("predictBtn").click()
-        } else if (verdictLetter === "") {
-          document.getElementById("verdictBtn").click()
-        } else {
-          resetGame()
-        }
-        buttonLedToggle(startBtn) // s
-      } else if (gameMode === GameModes[7]) { // GameMode.PREDICT
+        buttonLedOff(startBtnCode)
+      } else if (gameState === 1) {
+        document.getElementById("predictBtn").click()
+      } else if (gameState === 2) {
         document.getElementById("verdictBtn").click()
-        buttonLedToggle(startBtn) // s
+      } else if (gameState === 3) {
+        sendGameMode(9)
+      } else {
+        buttonLedToggle(startBtnCode) // s
+        resetGame()
       }
       break
     case "a","b","c":
@@ -63,7 +71,7 @@ function keypressFunc(evt) {
         verdictLetter = centroidToLetter(centroid)
         document.getElementById("verdictBtn").click()
         resetButtonBox()
-        buttonLedToggle(event.key.charCodeAt(0))
+        buttonLedToggle(evt.key.charCodeAt(0))
         setTimeout(() => {
           resetGame()
         }, 5000)
@@ -91,7 +99,7 @@ function startGame() {
         document.querySelector(".countdownTimer").innerHTML = ""
       }, 1000)
       sendGameMode(2) // GameMode.STOP
-      buttonLedOn(startBtn)
+      buttonLedOn(startBtnCode)
       document.getElementById("predictBtn").classList.add("down")
       hideOverlay()
     } else {
@@ -106,6 +114,12 @@ function resetGame() {
   resetButtonBox()
   dvCmd.setUint8(1, 0) // GameMode.IDLE
   ws.send(new Uint8Array(cmdBuf))
+  gameState = 0
+  predictLetter = ""
+  verdictLetter = ""
+  predictSeq = ""
+  eyePredictionDiv.innerHTML = ""
+  modelPredictionDiv.innerHTML = ""
 }
 
 ////////////////////////
@@ -123,10 +137,13 @@ function centroidToLetter(centroid) {
 }
 
 async function wsMessageHandler(evt) {
-  //console.log(`INCOMING: ${evt.data}`)
+  /*console.log(`INCOMING: ${evt.data}`)
   if (evt.data === null) { return }
   const buf = new Uint8Array(evt.data).buffer
-  const dv = new DataView(buf)
+  console.log(buf.byteLength)
+  console.log(buf)
+ */
+  const dv = new DataView(evt.data)
   const cmd = dv.getUint8(0)
   const mode = dv.getUint8(1)
   const len = dv.getInt32(2, true)
@@ -135,10 +152,11 @@ async function wsMessageHandler(evt) {
   const predictCanvas = document.getElementById("predictBox")
   const ctxSlides = slideCanvas.getContext("2d")
   const ctxTrace = predictCanvas.getContext("2d")
-  //console.log(cmd,mode,len, data)
-  // Game Mode
+  console.log(cmd,GameModes[mode],len, data)
+  // Update Game Mode
+  prevMode = gameMode
   gameMode = GameModes[parseInt(mode, 10)]
-  document.getElementById("gameMode").innerHTML = gameMode.toLowerCase()
+  document.getElementById("gameMode").innerHTML = `${GameStates[gameState].toLowerCase()} - ${gameMode.toLowerCase()}`
 
   switch (cmd) {
   case 0:
@@ -158,7 +176,10 @@ async function wsMessageHandler(evt) {
     }
     break
   case 3: // receive game sequence and snap
+    gameState = 1
     predictSeq += centroidToLetter(centroid)
+    eyePredictionDiv.innerHTML = predictSeq
+
     var blob = new Blob([data], {type: "image/png"})
     var img = new Image()
     img.onload = function (e) {
@@ -191,10 +212,14 @@ async function wsMessageHandler(evt) {
     console.log("not implemented")
     break
   case 7: // Time up! time for prediction
-    const ltsmPrediction = await fetch(`/api/predictSequence?seq=${predictSeq}`)
+    gameState = 2
+    const res = await fetch(`/api/predictSequence?seq=${predictSeq}`)
+    const ltsmPrediction = await res.text()
     predictLetter = centroidToLetter(centroid)
     console.log(`LTSM prediction : ${ltsmPrediction}`)
-    console.log(`Camera prediction : ${predictLetter}`)
+    console.log(`Camera predictions : ${predictSeq}`)
+    eyePredictionDiv.innerHTML = predictSeq
+    modelPredictionDiv.innerHTML = ltsmPrediction
     var blob = new Blob([data], {type: "image/png"})
     var img = new Image()
     img.onload = function (e) {
@@ -214,6 +239,7 @@ async function wsMessageHandler(evt) {
     }
     break
   case 8:
+    gameState = 3
     verdictLetter = centroidToLetter(centroid)
     var blob = new Blob([data], {type: "image/png"})
     var img = new Image()
@@ -232,9 +258,11 @@ async function wsMessageHandler(evt) {
       resetButtonBox()
       buttonLedOn(verdictLetter.charCodeAt(0))
     }
+    sendGameMode(2)
     showResults()
     break
   case 9:
+    gameState = 0
     const slideCanvas = document.getElementById("slideBox")
     const predictCanvas = document.getElementById("predictBox")
     addScore()
