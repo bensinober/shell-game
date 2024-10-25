@@ -9,7 +9,7 @@ html {
 }
 body {
   height:95%;
-  background-image: url("./parchment-texture.jpg");
+  background-color: black; text-align: center; color: gray;
   position: relative;
 }
 #title { font-family: 'Blade Runner Movie Font', sans-serif; text-align: center; height: 5rem; font-size: 62px;}
