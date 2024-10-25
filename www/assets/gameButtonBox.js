@@ -1,4 +1,5 @@
 // gameButtonBox.js
+import { resetGame } from "./script.js"
 
 ///////////////////////////////////
 // INPUT FROM SHELL GAME BUTTON BOX
@@ -29,7 +30,7 @@ async function connecToButtonBox(evt) {
 
 // toggle key led
 async function buttonLedToggle(key) {
-  console.log("LED TOGGLE", key)
+  //console.log("LED TOGGLE", key)
   if (buttonBoxWriter) {
     const data = new Uint8Array([key])
     await buttonBoxWriter.write(data)
@@ -39,7 +40,7 @@ async function buttonLedToggle(key) {
 
 // (key - 10) => led off
 async function buttonLedOff(key) {
-  console.log("LED OFF", key)
+  //console.log("LED OFF", key)
   if (buttonBoxWriter) {
     const data = new Uint8Array([key - 10])
     await buttonBoxWriter.write(data)
@@ -49,7 +50,7 @@ async function buttonLedOff(key) {
 
 // (key + 10) => led on
 async function buttonLedOn(key) {
-  console.log("LED ON", key)
+  //console.log("LED ON", key)
   if (buttonBoxWriter) {
     const data = new Uint8Array([key + 10])
     await buttonBoxWriter.write(data)
@@ -58,7 +59,7 @@ async function buttonLedOn(key) {
 }
 
 function resetButtonBox() {
-  console.log("RESET BUTTON BOX")
+  //console.log("RESET BUTTON BOX")
   if (buttonBoxWriter) {
     for (const b of [gameABtn, gameBBtn, gameCBtn]) {
       buttonLedOff(b)

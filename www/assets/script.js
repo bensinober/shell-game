@@ -29,7 +29,7 @@ var eyesActive = false
 
 // Websocket client
 const ws = new WebSocket(`wss://${window.location.host}/ws?channels=shell-game`)
-ws.addEventListener("open", event => ws.binaryType = "arraybuffer")
+ws.binaryType = "arraybuffer"
 ws.addEventListener("message", wsMessageHandler)
 
 const startBtn = document.getElementById("startBtn")
@@ -123,8 +123,10 @@ function centroidToLetter(centroid) {
 }
 
 async function wsMessageHandler(evt) {
-  //console.log(`INCOMING: ${event.data}`)
-  const dv = new DataView(evt.data);
+  //console.log(`INCOMING: ${evt.data}`)
+  if (evt.data === null) { return }
+  const buf = new Uint8Array(evt.data).buffer
+  const dv = new DataView(buf)
   const cmd = dv.getUint8(0)
   const mode = dv.getUint8(1)
   const len = dv.getInt32(2, true)
@@ -145,8 +147,7 @@ async function wsMessageHandler(evt) {
   case 1:
     console.log("game mode change")
     break
-  case 2:
-    // centroid
+  case 2: // centroid received
     const x = dv.getInt32(6, true)
     const y = dv.getInt32(10, true)
     centroid = {x, y}
@@ -156,8 +157,7 @@ async function wsMessageHandler(evt) {
       writeToEyes(x, y)
     }
     break
-  case 3:
-    // update gameSeq
+  case 3: // receive game sequence and snap
     predictSeq += centroidToLetter(centroid)
     var blob = new Blob([data], {type: "image/png"})
     var img = new Image()
@@ -188,11 +188,13 @@ async function wsMessageHandler(evt) {
     fetch("/api/snapimg", { method: "POST", body: formData })
     break
   case 4:
-    console.log("dunno")
+    console.log("not implemented")
     break
-  case 7:
-    // TODO: send to web service here for prediction?
+  case 7: // Time up! time for prediction
+    const ltsmPrediction = await fetch(`/api/predictSequence?seq=${predictSeq}`)
     predictLetter = centroidToLetter(centroid)
+    console.log(`LTSM prediction : ${ltsmPrediction}`)
+    console.log(`Camera prediction : ${predictLetter}`)
     var blob = new Blob([data], {type: "image/png"})
     var img = new Image()
     img.onload = function (e) {
@@ -392,4 +394,4 @@ function toggleEyesActive() {
   }
 }
 
-export { startGame, sendGameMode, clearData, setSnapContext, toggleEyesActive, fetchStats, hideOverlay }
+export { startGame, sendGameMode, clearData, resetGame, setSnapContext, toggleEyesActive, fetchStats, hideOverlay }

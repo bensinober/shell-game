@@ -1,10 +1,22 @@
 // Bun server with websocket and static file serving
 import { Database } from "bun:sqlite"
-const db = new Database("shell-game.db")
+import { recurrent, NeuralNetwork, NeuralNetworkGPU } from "./www/assets/brain.js"
 
+
+const db = new Database("shell-game.db")
 db.exec("PRAGMA journal_mode = WAL;")
+
 const BASE_PATH = "./www"
 var pendingBuffer,pendingCmd, pendingSize, pendingMode
+
+const net = new recurrent.LSTM({hiddenLayers: [20]})
+/*const net = new NeuralNetwork({
+  hiddenLayers: [10, 10],
+  activation: "sigmoid",
+})*/
+const model = Bun.file("www/assets/model.json")
+const ltsmModel = await model.json()
+net.fromJSON(ltsmModel)
 
 const httpServer = Bun.serve({
   port: 8665,
@@ -81,6 +93,18 @@ const httpServer = Bun.serve({
         //db.query(`UPDATE stats SET slideimg=?1 WHERE uuid=?2`)
         //  .run(imgPath, uuid)
         return new Response("OK")
+      } catch(err) {
+        console.log(err)
+      }
+      break
+
+    case "/api/predictSequence":
+      try {
+        const { searchParams } = new URL(req.url)
+        const seq = searchParams.get("seq")
+        const res = await net.run(seq.split(""))
+        console.log(res)
+        return new Response(res)
       } catch(err) {
         console.log(err)
       }

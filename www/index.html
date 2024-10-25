@@ -16,8 +16,8 @@
     <div id="dividedbox">
       <div class="quarter" id="NW">
         <div class="scores">
-          <div class="col">maskin:</div><div class="col" id="machineScore">15</div>
-          <div class="col">menneske:</div><div class="col" id="humanScore">45</div>
+          <div class="col">maskin:</div><div class="col" id="machineScore">0</div>
+          <div class="col">menneske:</div><div class="col" id="humanScore">0</div>
         </div>
       </div>
       <div class="quarter" id="NE">
@@ -45,12 +45,12 @@
   </div>
   <script type="module" id="main">
 
-    import { startGame, sendGameMode, toggleEyesActive } from "./assets/script.js"
+    import { fetchStats, startGame, sendGameMode, toggleEyesActive } from "./assets/script.js"
     import { connectToEyes } from "./assets/eyes.js"
     import { connecToButtonBox } from "./assets/gameButtonBox.js"
 
     document.addEventListener("DOMContentLoaded", function() {
-
+      fetchStats()
       // simple countdown timer
       document.getElementById("startBtn").addEventListener("click", startGame)
 
@@ -71,7 +71,7 @@
       document.getElementById("connectBtn").addEventListener("click", function(evt) {
         // connect to button box and eyes
         connecToButtonBox()
-        connectToEyes() // TODO: handle BTLE in app instead
+        //connectToEyes() // TODO: handle BTLE in app instead
       })
       document.getElementById("eyesBtn").addEventListener("click", toggleEyesActive)
 
