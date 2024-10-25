@@ -17,10 +17,16 @@ var CLASSES = [_][]const u8{ "red_cup", "green_disc" };
 const green = cv.Color{ .g = 255 };
 const red = cv.Color{ .r = 255 };
 
-// Bluetooth eyes // micro:bit
+// Bluetooth eyes
 var btConnected: bool = false;
-const btPeriphStr: []const u8 = "FB:C9:6D:CB:9D:63";
-const btServiceUuidStr: []const u8 = "e2e00001-15cf-4074-9331-6fac42a4920b";
+
+// micro:bit v1
+//const btPeriphStr: []const u8 = "FB:C9:6D:CB:9D:63";
+//const btServiceUuidStr: []const u8 = "e2e00001-15cf-4074-9331-6fac42a4920b";
+
+// micro:bit v2
+const btPeriphStr: []const u8 = "EF:DD:FD:DA:E1:AE";
+const btServiceUuidStr: []const u8 = "e2e10001-15cf-4074-9331-6fac42a4920b";
 const btCharId: usize = 1; // choose second characteristic, as it is writable
 var btPeripheral: ble.simpleble_peripheral_t = undefined;
 var btService: ble.simpleble_service_t = undefined; //.{ .value = microbitUartServicePtr };
