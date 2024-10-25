@@ -603,7 +603,7 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
     }
 
     // add overlay traces to output img, need to convert input img to 4chan with alpha first
-    cv.cvtColor(img.*, img, .bgr_to_bgra);
+    //cv.cvtColor(img.*, img, .bgr_to_bgra);
     //tracker.overlay.copyTo(img);
     //img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
 
@@ -647,7 +647,7 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
         },
         .SNAP => {
             std.debug.print("SENDING IMAGE\n", .{});
-            img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
+            //img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
             try tracker.sendImage(img);
             gameMode = lastGameMode;
         },
@@ -655,14 +655,13 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
             if (focusObj) |obj| {
                 if (obj.id == tracker.focusId) {
                     cv.rectangle(img, obj.box, red, 5);
-                    img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
                     std.debug.print("PREDICT : CUP ID {d} FOUND!\n", .{tracker.focusId});
                 } else {
                     std.debug.print("PREDICT : CUP ID {d} NOT FOUND!\n", .{tracker.focusId});
                 }
             }
 
-            img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
+            //img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
             try tracker.sendImage(img);
             gameMode = lastGameMode;
         },
@@ -670,12 +669,12 @@ fn performDetection(img: *Mat, scoreMat: Mat, rows: usize, _: Size, tracker: *Tr
             if (focusObj) |obj| {
                 if (obj.id == tracker.focusId) {
                     cv.rectangle(img, obj.box, red, 5);
-                    img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
                     std.debug.print("VERDICT : CUP ID {d} FOUND!\n", .{tracker.focusId});
                 } else {
                     std.debug.print("VERDICT : CUP ID {d} NOT FOUND!\n", .{tracker.focusId});
                 }
             }
+            //img.addMatWeighted(1.0, tracker.overlay, 0.4, 0.5, img);
             try tracker.sendImage(img);
             if (focusObj) |obj| {
                 try tracker.sendStats(obj);
@@ -858,8 +857,8 @@ pub fn main() anyerror!void {
     var tracker = try Tracker.init(allocator);
     //defer tracker.deinit();
 
-    cv.cvtColor(img, &img, .bgra_to_bgr);
-    tracker.overlay.copyTo(&img);
+    //cv.cvtColor(img, &img, .bgra_to_bgr);
+    //tracker.overlay.copyTo(&img);
 
     // open DNN object tracking model
     // YOLOv8 pytorch onnx INFERENCE
