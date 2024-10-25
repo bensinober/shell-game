@@ -76,6 +76,8 @@ function keypressFunc(evt) {
 
 function startGame() {
   startBtn.classList.remove("down")
+  let mySound = new Audio("assets/counter.mp3")
+  mySound.play()
   showOverlay("snurr i vei!")
   clearData()
   duration = 18 // one game = 18 secs
@@ -95,10 +97,6 @@ function startGame() {
     } else {
       document.querySelector(".countdownTimer").innerHTML = "00:" + duration.toString().padStart(2, "0")
       sendGameMode(3) // GameMode.SNAP
-      if (duration < 4) {
-        let mySound = new Audio("assets/beep-09.wav")
-        mySound.play()
-      }
     }
     duration -= 1
     slideCnt += 1
