@@ -20,16 +20,12 @@ async function writeToEyes(x, y) {
 
 async function connectToEyes() {
 
-  // benjis microbit
+  // benjis microbit v1
   // fb:c9:6d:cb:9d:63
-  // service UUID:         e2e00001-15cf-4074-9331-6fac42a4920b
-  // characteristics UUID: e2e00002-15cf-4074-9331-6fac42a4920b
   //const serviceUUID = "e2e00001-15cf-4074-9331-6fac42a4920b"
   //const characteristicUUID = "e2e00002-15cf-4074-9331-6fac42a4920b" // serial
 
   // benjis microbit v2
-  // service UUID:         e2e10001-15cf-4074-9331-6fac42a4920b
-  // characteristics UUID: e2e10002-15cf-4074-9331-6fac42a4920b
   const serviceUUID = "e2e10001-15cf-4074-9331-6fac42a4920b"
   const characteristicUUID = "e2e10002-15cf-4074-9331-6fac42a4920b" // serial
 
