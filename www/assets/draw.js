@@ -1,4 +1,4 @@
-import { eyesConnected } from "./eyes.js"
+import { eyesConnected, writeToEyes } from "./eyes.js"
 
 const drawSvg = document.querySelector("#drawSvg")
 const svgBoundingRect = drawSvg.getBoundingClientRect()
