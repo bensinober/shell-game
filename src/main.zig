@@ -25,7 +25,9 @@ var btConnected: bool = false;
 //const btServiceUuidStr: []const u8 = "e2e00001-15cf-4074-9331-6fac42a4920b";
 
 // micro:bit v2
-const btPeriphStr: []const u8 = "EF:DD:FD:DA:E1:AE";
+// const btPeriphStr: []const u8 = "EF:DD:FD:DA:E1:AE";
+// const btServiceUuidStr: []const u8 = "e2e10001-15cf-4074-9331-6fac42a4920b";
+const btPeriphStr: []const u8 = "D1:FB:74:83:54:34";
 const btServiceUuidStr: []const u8 = "e2e10001-15cf-4074-9331-6fac42a4920b";
 const btCharId: usize = 1; // choose second characteristic, as it is writable
 var btPeripheral: ble.simpleble_peripheral_t = undefined;
@@ -69,11 +71,11 @@ const MsgHandler = struct {
     // 1. change Game Mode
     // 2. enable bluetooth
     // 3. disable bluetooth
-    pub fn handle(self: MsgHandler, msg: websocket.Message) !void {
-        std.log.debug("got msg: {any}", .{msg.data});
-        const cmd = msg.data[0];
+    pub fn serverMessage(self: MsgHandler, msg: []u8) !void {
+        std.log.debug("got msg: {any}", .{msg});
+        const cmd = msg[0];
         if (cmd == 1) {
-            const mode: GameMode = @enumFromInt(msg.data[1]);
+            const mode: GameMode = @enumFromInt(msg[1]);
             lastGameMode = gameMode;
             gameMode = mode;
             const mb: u8 = std.mem.asBytes(&gameMode)[0];
@@ -963,7 +965,7 @@ pub fn main() anyerror!void {
     defer certFile.close();
 
     _ = try std.crypto.Certificate.Bundle.addCertsFromFile(&certBundle, allocator, certFile);
-    wsClient = try websocket.connect(allocator, "localhost", 8665, .{ .tls = true, .ca_bundle = certBundle });
+    wsClient = try websocket.Client.init(allocator, .{ .host = "localhost", .port = 8665, .tls = true, .ca_bundle = certBundle });
     defer wsClient.deinit();
 
 

@@ -26,28 +26,21 @@ pub fn build(b: *std.Build) void {
     cv.addLibraryPath(b.path("libs"));
     cv.addLibraryPath(b.path("libs/contrib"));
     cv.addIncludePath(b.path("include/opencv4")); // linked in from /usr/local/include/opencv4
-    cv.addCSourceFiles(.{ .files = &.{
-        "libs/asyncarray.cpp",
-        "libs/calib3d.cpp",
-        "libs/core.cpp",
-        "libs/dnn.cpp",
-        "libs/features2d.cpp",
-        "libs/highgui.cpp",
-        "libs/imgcodecs.cpp",
-        "libs/imgproc.cpp",
-        "libs/objdetect.cpp",
-        "libs/photo.cpp",
-        "libs/svd.cpp",
-        "libs/version.cpp",
-        "libs/video.cpp",
-        "libs/videoio.cpp",
-        "libs/contrib/tracking.cpp",
-    }, .flags = &[_][]const u8{
-        "-Wall",
-        "-Wextra",
-        "-std=c++11",
-        "-stdlib=libc++",
-    } });
+    cv.addCSourceFile(.{ .file = b.path("libs/asyncarray.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/calib3d.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/core.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/dnn.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/features2d.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/highgui.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/imgcodecs.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/imgproc.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/objdetect.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/photo.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/svd.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/version.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/video.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/videoio.cpp"), .flags = &.{} });
+    cv.addCSourceFile(.{ .file = b.path("libs/contrib/tracking.cpp"), .flags = &.{} });
 
     cv.linkLibC();
     cv.linkLibCpp();
@@ -64,27 +57,22 @@ pub fn build(b: *std.Build) void {
 
     // Compile in zigcv module
     const zigcvMod = b.addModule("zigcv", .{ .root_source_file = b.path("libs/zigcv.zig") });
-    zigcvMod.addCSourceFiles(.{ .files = &.{
-        "libs/asyncarray.cpp",
-        "libs/calib3d.cpp",
-        "libs/core.cpp",
-        "libs/dnn.cpp",
-        "libs/features2d.cpp",
-        "libs/highgui.cpp",
-        "libs/imgcodecs.cpp",
-        "libs/imgproc.cpp",
-        "libs/objdetect.cpp",
-        "libs/photo.cpp",
-        "libs/svd.cpp",
-        "libs/version.cpp",
-        "libs/video.cpp",
-        "libs/videoio.cpp",
-        "libs/contrib/tracking.cpp",
-    }, .flags = &[_][]const u8{
-        "-Wall",
-        "-Wextra",
-        "-std=c++11",
-    } });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/asyncarray.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/calib3d.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/core.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/dnn.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/features2d.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/highgui.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/imgcodecs.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/imgproc.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/objdetect.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/photo.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/svd.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/version.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/video.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/videoio.cpp"), .flags = &.{} });
+    zigcvMod.addCSourceFile(.{ .file = b.path("libs/contrib/tracking.cpp"), .flags = &.{} });
+
     zigcvMod.addIncludePath(b.path("include"));
     zigcvMod.addIncludePath(b.path("include/contrib"));
     zigcvMod.addIncludePath(b.path("include/opencv4")); // linked in from /usr/local/include/opencv4

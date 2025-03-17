@@ -48,8 +48,8 @@ function stopDraw() {
 function getMousePosition(event) {
   const x = Math.floor(event.clientX - svgBoundingRect.left)
   const y = Math.floor(event.clientY - svgBoundingRect.top)
-  const relX = Math.round(x / drawSvg.width * 255)
-  const relY = Math.round((drawSvg.height - y) / drawSvg.height * 255) // invert and compress y-axis
+  const relX = Math.round(x / svgBoundingRect.width * 255)
+  const relY = Math.round((svgBoundingRect.height - y) / svgBoundingRect.height * 255) // invert and compress y-axis
   //console.log(`x: ${x} => ${relX}, y: ${y} => ${relY}`)
   return { coord: {x, y}, rel: {x: relX, y: relY} }
 }

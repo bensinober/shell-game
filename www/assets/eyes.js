@@ -37,8 +37,8 @@ async function connectToEyes() {
     console.log("Requesting Bluetooth Device...")
     //var ble = await navigator.bluetooth.getAvailability()
     const btDevice = await navigator.bluetooth.requestDevice({
-      //acceptAllDevices: true,
-      filters: [{ namePrefix: "Benji" }, { name:  "HMSoft"}],
+      acceptAllDevices: true,
+      //filters: [{ namePrefix: "Folk" }, { name:  "HMSoft"}],
       optionalServices: [serviceUUID],
       //filters: [{ services: [serviceUUID] }], // fake service to send raw data as serial
       //filters: [{ name: "HMSoft" }],
